@@ -16,8 +16,14 @@ find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(builtin_interfaces REQUIRED)
+find_package(rclcpp_lifecycle REQUIRED)
+find_package(hardware_interface REQUIRED)
+find_package(pluginlib REQUIRED)
 
-add_executable(neo_linear_axis src/neo_linear_axis.cpp)
+add_library(neo_linear_axis 
+  SHARED
+  src/nla_hardware_interface.cpp
+  src/neo_linear_joint.cpp)
 target_include_directories(neo_linear_axis PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
@@ -33,10 +39,25 @@ ament_target_dependencies(
   "tf2_geometry_msgs"
   "sensor_msgs"
   "builtin_interfaces"
+  "rclcpp_lifecycle"
+  "hardware_interface"
+  "pluginlib"
 )
 
+pluginlib_export_plugin_description_file(
+  hardware_interface nla.xml)
+
 install(TARGETS neo_linear_axis
-  DESTINATION lib/${PROJECT_NAME})
+  RUNTIME DESTINATION bin
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib)
+
+install(
+  DIRECTORY include/
+  DESTINATION include
+)
+
+
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

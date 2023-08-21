@@ -1,0 +1,9 @@
+<library path="neo_linear_axis">
+  <class name="nla/NlaHardwareInterface"
+         type="nla::NlaHardwareInterface"
+         base_class_type="hardware_interface::SystemInterface">
+    <description>
+      ros2_control hardware interface for neo_linear_axis.
+    </description>
+  </class>
+</library>
