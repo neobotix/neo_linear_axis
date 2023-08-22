@@ -44,11 +44,13 @@ CallbackReturn NlaHardwareInterface::on_init(const hardware_interface::HardwareI
 CallbackReturn NlaHardwareInterface::on_configure(const rclcpp_lifecycle::State & /*info*/)
 {
   // Comms initialization
+  linear_joint_->initComms();
   return CallbackReturn::SUCCESS; 
 }
 
 CallbackReturn NlaHardwareInterface::on_activate(const hardware_interface::HardwareInfo & /*info*/)
 {
+  linear_joint_->initMotor();
   return CallbackReturn::SUCCESS;
 }
 

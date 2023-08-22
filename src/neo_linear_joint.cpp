@@ -32,67 +32,26 @@ using std::placeholders::_1;
 NeoLinearJoint::NeoLinearJoint(motor_t motor)
 {
   motor_ = motor;
+  motorOp_ = std::make_shared<ElmoMotorModule>(motor_);
 }
 
 NeoLinearJoint::~NeoLinearJoint()
 {}
 
-void NeoLinearJoint::initialize()
+void NeoLinearJoint::initComms()
 {
-  std::lock_guard<std::mutex> lock(node_mutex_);
-
-  waitForCanSock_ = true;
-
-  // start network
-  {
-    can_msg_t msg;
-    msg.id = 0;
-    msg.length = 2;
-    msg.data[0] = 1;
-    msg.data[1] = 0;
-    transmitCan(msg);
-  }
-  canSync();
-
-  // reset motor states
+  motorOp_->initializeNmt();
 }
 
-void NeoLinearJoint::transmitCan(const can_msg_t & msg)
+void NeoLinearJoint::initMotor()
 {
-  ::can_frame out = {};
-  out.can_id = msg.id;
-  out.can_dlc = msg.length;
-  for (int i = 0; i < msg.length; ++i) {
-    out.data[i] = msg.data[i];
-  }
+  motorOp_->motorOff();
+  motorOp_->setMotorModulo();
+  motorOp_->resetPosCounter();
+  motorOp_->configurePDOMapping();
+  motorOp_->motorOn();
+  motorOp_->requestMotorStatus();
 
-  // wait for socket to be ready for writing
-  if (waitForCanSock_) {
-    std::unique_lock<std::mutex> lock(can_mutex_);
-    while (doRun_ && canSock_ < 0) {
-      can_condtion_.wait(lock);
-    }
-  }
+  /*show error if any in the above initialization step*/
 
-  if (!doRun_) {
-    throw std::runtime_error("shutdown");
-  }
-
-  // send msg
-  {
-    const auto res = ::write(canSock_, &out, sizeof(out));
-    if (res < 0) {
-      throw std::runtime_error("write() failed with: " + std::string(strerror(errno)));
-    }
-    if (res != sizeof(out)) {
-      // re-open socket
-      ::shutdown(canSock_, SHUT_RDWR);
-      throw std::logic_error("write() buffer overflow!");
-    }
-  }
-}
-
-void NeoLinearJoint::canSync()
-{
-  ::usleep(10000);    // workaround, sleep for around 10 msgs
 }

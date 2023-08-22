@@ -30,7 +30,10 @@ SOFTWARE.
 
 #include <neo_linear_axis/can_msg.hpp>
 #include <neo_linear_axis/motor.hpp>
+#include <neo_linear_axis/ElmoMotorModule.hpp>
+
 #include <mutex>
+
 
 #ifndef NEO_LINEAR_AXIS__NEO_LINEAR_JOINT_HPP_
 #define NEO_LINEAR_AXIS__NEO_LINEAR_JOINT_HPP_
@@ -42,26 +45,17 @@ public:
   NeoLinearJoint(motor_t motor);
   ~NeoLinearJoint();
 
-  void initialize();
+  void initComms();
+  void initMotor();
 
   // void sdoDownload(
   //   int & node_id, int32_t obj_index, int32_t obj_sub_index,
   //   int32_t data);
-  void transmitCan(const can_msg_t & msg);
-  void canSync();
   // int32_t read_int32(const can_msg_t & msg, int offset);
   // float read_float(const can_msg_t & msg, int offset)
 private:
-  std::mutex node_mutex_;
-  std::mutex can_mutex_;
-
-  bool waitForCanSock_ = false;
-  volatile bool doRun_ = true;
-
-  std::condition_variable can_condtion_;
-  int canSock_ = -1;
-
   motor_t motor_;
+  std::shared_ptr<ElmoMotorModule> motorOp_;
 };
 
 #endif // NEO_LINEAR_AXIS__NEO_LINEAR_JOINT_HPP_

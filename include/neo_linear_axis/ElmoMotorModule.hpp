@@ -1,0 +1,67 @@
+/*********************************************************************
+MIT License
+
+Copyright (c) 2023 neobotix gmbh
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+ *********************************************************************/
+
+#include <neo_linear_axis/can_msg.hpp>
+#include <neo_linear_axis/motor.hpp>
+#include <linux/can.h>
+#include <linux/can/raw.h>
+#include <sys/ioctl.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+
+#ifndef NEO_LINEAR_AXIS__ELMO_MOTOR_MODULE_HPP_
+#define NEO_LINEAR_AXIS__ELMO_MOTOR_MODULE_HPP_
+
+class ElmoMotorModule
+{
+public:
+  ElmoMotorModule(motor_t motor);
+  ~ElmoMotorModule();
+
+  void initializeNmt();
+  void canSync();
+  void transmitCan(const can_msg_t & msg);
+  void setMotorModulo();
+  void configurePDOMapping();
+  void resetPosCounter();
+  void motorOn();
+  void motorOff();
+  void requestMotorStatus();
+
+private:
+  void canopen_set_int(char cmd_char_1, char cmd_char_2, int32_t index, int32_t data);
+  void canOpenSDODownload(int32_t obj_index, int32_t obj_sub_index, int32_t data);
+  void canOpenQuery(char cmd_char_1, char cmd_char_2, int32_t index);
+
+  motor_t motor_;
+  bool waitForCanSock_ = false;
+  std::mutex node_mutex_;
+  std::mutex can_mutex_;
+
+  volatile bool doRun_ = true;
+
+  std::condition_variable can_condtion_;
+  int canSock_ = -1;
+};
+#endif // NEO_LINEAR_AXIS__ELMO_MOTOR_MODULE_HPP_

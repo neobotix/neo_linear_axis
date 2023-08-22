@@ -22,6 +22,7 @@ find_package(pluginlib REQUIRED)
 
 add_library(neo_linear_axis 
   SHARED
+  src/ElmoMotorModule.cpp
   src/nla_hardware_interface.cpp
   src/neo_linear_joint.cpp)
 target_include_directories(neo_linear_axis PUBLIC
