@@ -39,27 +39,60 @@ NeoLinearJoint::~NeoLinearJoint()
 
 void NeoLinearJoint::initialize()
 {
-  std::lock_guard<std::mutex> lock(m_node_mutex);
+  std::lock_guard<std::mutex> lock(node_mutex_);
 
-  waitForCanSock = true;
+  waitForCanSock_ = true;
 
   // start network
-  // {
-  //   can_msg_t msg;
-  //   msg.id = 0;
-  //   msg.length = 2;
-  //   msg.data[0] = 1;
-  //   msg.data[1] = 0;
-  //   can_transmit(msg);
-  // }
-  // canSync();
+  {
+    can_msg_t msg;
+    msg.id = 0;
+    msg.length = 2;
+    msg.data[0] = 1;
+    msg.data[1] = 0;
+    transmitCan(msg);
+  }
+  canSync();
 
-  // reset motors
-
-
+  // reset motor states
 }
 
-// void NeoLinearJoint::canSync()
-// {
-//   ::usleep(10000);    // workaround, sleep for around 10 msgs
-// }
+void NeoLinearJoint::transmitCan(const can_msg_t & msg)
+{
+  ::can_frame out = {};
+  out.can_id = msg.id;
+  out.can_dlc = msg.length;
+  for (int i = 0; i < msg.length; ++i) {
+    out.data[i] = msg.data[i];
+  }
+
+  // wait for socket to be ready for writing
+  if (waitForCanSock_) {
+    std::unique_lock<std::mutex> lock(can_mutex_);
+    while (doRun_ && canSock_ < 0) {
+      can_condtion_.wait(lock);
+    }
+  }
+
+  if (!doRun_) {
+    throw std::runtime_error("shutdown");
+  }
+
+  // send msg
+  {
+    const auto res = ::write(canSock_, &out, sizeof(out));
+    if (res < 0) {
+      throw std::runtime_error("write() failed with: " + std::string(strerror(errno)));
+    }
+    if (res != sizeof(out)) {
+      // re-open socket
+      ::shutdown(canSock_, SHUT_RDWR);
+      throw std::logic_error("write() buffer overflow!");
+    }
+  }
+}
+
+void NeoLinearJoint::canSync()
+{
+  ::usleep(10000);    // workaround, sleep for around 10 msgs
+}

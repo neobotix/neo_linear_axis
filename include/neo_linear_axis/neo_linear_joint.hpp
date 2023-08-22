@@ -22,6 +22,12 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
  *********************************************************************/
 
+#include <linux/can.h>
+#include <linux/can/raw.h>
+#include <sys/ioctl.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+
 #include <neo_linear_axis/can_msg.hpp>
 #include <neo_linear_axis/motor.hpp>
 #include <mutex>
@@ -41,13 +47,20 @@ public:
   // void sdoDownload(
   //   int & node_id, int32_t obj_index, int32_t obj_sub_index,
   //   int32_t data);
-  // void transmitCan(const can_msg_t & msg);
-  // void canSync();
+  void transmitCan(const can_msg_t & msg);
+  void canSync();
   // int32_t read_int32(const can_msg_t & msg, int offset);
   // float read_float(const can_msg_t & msg, int offset)
 private:
-  std::mutex m_node_mutex;
-  bool waitForCanSock = false;
+  std::mutex node_mutex_;
+  std::mutex can_mutex_;
+
+  bool waitForCanSock_ = false;
+  volatile bool doRun_ = true;
+
+  std::condition_variable can_condtion_;
+  int canSock_ = -1;
+
   motor_t motor_;
 };
 
