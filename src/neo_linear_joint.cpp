@@ -46,7 +46,11 @@ void NeoLinearJoint::initComms()
 void NeoLinearJoint::initMotor()
 {
   motorOp_->motorOff();
+  motorOp_->stopMotion();
+
+  // Disable watchdog
   motorOp_->setMotorModulo();
+  motorOp_->enableVelMode(); // Just for Homing
   motorOp_->resetPosCounter();
   motorOp_->configurePDOMapping();
   motorOp_->motorOn();
@@ -54,4 +58,51 @@ void NeoLinearJoint::initMotor()
 
   /*show error if any in the above initialization step*/
 
+}
+
+void NeoLinearJoint::setClock(rclcpp::Clock & clock)
+{
+  clock_ = clock;
+  motorOp_->setClock(clock);
+}
+
+void NeoLinearJoint::setMotorTimeout(double & timeout)
+{
+  motor_timeout_ = timeout;
+}
+
+void NeoLinearJoint::setHomeVel(double & homeVel)
+{
+  homeVel_ = homeVel;
+  motorOp_->setHomeVel(homeVel_);
+}
+
+void NeoLinearJoint::setHomeDigIn(int & digIn)
+{
+  motorOp_->setHomeDigIn(digIn);
+}
+
+void NeoLinearJoint::updateMotor()
+{
+  // Check for motor timeouts
+
+  if (motor_.state != ST_MOTOR_FAILURE) {
+    motorOp_->checkMotorTimeout(motor_timeout_);
+    if (motor_.state == ST_MOTOR_FAILURE) {
+      std::cout<<"motor timeout"<<std::endl;
+    }
+  }
+
+  // Check if motor is operational
+
+  if (motorOp_->isReset()
+    && motorOp_->isOperational()) {
+    std::cout<<"Linear joint is operational"<<std::endl;
+  }
+
+  if (!motorOp_->isHomed()) {
+    motorOp_->setHomeVel(homeVel_);
+    motorOp_->startHoming();
+  }
+  
 }

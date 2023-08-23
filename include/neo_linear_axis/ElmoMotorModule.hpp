@@ -36,7 +36,7 @@ SOFTWARE.
 class ElmoMotorModule
 {
 public:
-  ElmoMotorModule(motor_t motor);
+  ElmoMotorModule(motor_t & motor);
   ~ElmoMotorModule();
 
   void initializeNmt();
@@ -48,20 +48,41 @@ public:
   void motorOn();
   void motorOff();
   void requestMotorStatus();
+  void checkMotorTimeout(const double & timeout);
+  void setClock(rclcpp::Clock & clock);
+  bool isReset();
+  bool isOperational();
+  void enableVelMode();
+  bool isHomed();
+  void setHomeVel(double & homeVel);
+  void startHoming();
+  void beginMotion();
+  void stopMotion();
+  bool isStopped();
+  void setHomeDigIn(int & HomeDigIn);
 
 private:
   void canopen_set_int(char cmd_char_1, char cmd_char_2, int32_t index, int32_t data);
   void canOpenSDODownload(int32_t obj_index, int32_t obj_sub_index, int32_t data);
   void canOpenQuery(char cmd_char_1, char cmd_char_2, int32_t index);
+  void motorSetVel(double & rotVelRadS);
 
   motor_t motor_;
   bool waitForCanSock_ = false;
   std::mutex node_mutex_;
   std::mutex can_mutex_;
+  rclcpp::Clock clock_;
+  bool isMotorReset_ = true;
+  bool isHomed_ = false;
+  bool isHoming_ = false;
+  bool isStopped_ = true;
+  int HomeDigIn_;
 
   volatile bool doRun_ = true;
 
   std::condition_variable can_condtion_;
   int canSock_ = -1;
+
+  double homeVel_;
 };
 #endif // NEO_LINEAR_AXIS__ELMO_MOTOR_MODULE_HPP_

@@ -27,7 +27,7 @@ SOFTWARE.
 
 using std::placeholders::_1;
 
-ElmoMotorModule::ElmoMotorModule(motor_t motor)
+ElmoMotorModule::ElmoMotorModule(motor_t & motor)
 {
   // configuring CAN for the motor transmission
   motor_ = motor;
@@ -144,6 +144,137 @@ void ElmoMotorModule::setMotorModulo()
   canSync();
 }
 
+void ElmoMotorModule::enableVelMode()
+{
+  // switch Unit Mode
+  canopen_set_int('U', 'M', 0, 2);
+
+  // set profile mode (only if Unit Mode = 2)
+  canopen_set_int('P', 'M', 0, 1);
+
+  // set maximum acceleration to X Incr/s^2
+  canopen_set_int('A', 'C', 0, motor_.max_accel_enc_s);
+
+  // set maximum decceleration to X Incr/s^2
+  canopen_set_int('D', 'C', 0, motor_.max_accel_enc_s);
+
+  canSync();
+}
+
+void ElmoMotorModule::setClock(rclcpp::Clock & clock)
+{
+  clock_ = clock;
+}
+
+void ElmoMotorModule::setHomeVel(double & homeVel)
+{
+  homeVel_ = homeVel;
+}
+
+void ElmoMotorModule::beginMotion()
+{
+  canOpenQuery('B', 'G', 0);
+  canSync();
+}
+
+void ElmoMotorModule::stopMotion()
+{
+  canOpenQuery('S', 'T', 0);
+  isStopped_ = true;
+  canSync();
+}
+
+void ElmoMotorModule::startHoming()
+{
+  if (isHoming_ && !isOperational() && !isStopped()) {
+    return;
+  }
+  stopMotion();
+  // disableWatchdog();
+
+  canopen_set_int('H', 'M', 1, 0);
+  canSync();
+
+  // configure homing sequences
+  // setting the value such that increment counter resets after the homing event occurs
+  canopen_set_int('H', 'M', 2, motor_.enc_home_offset);
+  canSync();
+
+  /** choosing channel/switch on which controller has to 
+   listen for change of homing event(high/low/falling/rising) **/
+  canopen_set_int('H', 'M', 3, HomeDigIn_);
+  canSync();
+
+  // choose the action that the controller shall perform after the homing event occurred
+  // HM[4] = 0 : after Event stop immediately
+  // HM[4] = 2 : do nothing
+  canopen_set_int('H', 'M', 4, 2);
+  canSync();
+
+  // choose the setting of the position counter
+  // (i.e. to the value defined in 2.a) after the homing event occured
+  // HM[5] = 0 : absolute setting of position counter: PX = HM[2]
+  canopen_set_int('H', 'M', 5, 0);
+  canSync();
+
+  motorSetVel(homeVel_);
+  canSync();
+
+  beginMotion();
+
+  isHomed_ = false;
+  isHoming_ = true;
+}
+
+void ElmoMotorModule::motorSetVel(double & rotVelRadS)
+{
+  const double motor_vel_rev_s = motor_.gear_ratio * rotVelRadS / (2 * M_PI);
+  const int32_t motor_vel_inc_s = motor_.rot_sign *
+    static_cast<int>(motor_vel_rev_s * motor_.enc_ticks_per_rev);
+  const int32_t lim_motor_vel_inc_s = std::min(
+    std::max(
+      motor_vel_inc_s,
+      -motor_.max_vel_enc_s),
+    motor_.max_vel_enc_s);
+
+  canopen_set_int('J', 'V', 0, lim_motor_vel_inc_s);
+}
+
+void ElmoMotorModule::setHomeDigIn(int & HomeDigIn)
+{
+  HomeDigIn_ = HomeDigIn;
+}
+
+bool ElmoMotorModule::isHomed()
+{
+  return isHomed_;
+}
+
+bool ElmoMotorModule::isReset()
+{
+  return isMotorReset_;
+}
+
+bool ElmoMotorModule::isStopped()
+{
+  if (motor_.curr_enc_vel_inc_s > 100) {
+    isStopped_ = false;
+  } else {
+    isStopped_ = true;
+  }
+  // Log
+  return isStopped_;
+}
+
+bool ElmoMotorModule::isOperational()
+{
+  if (motor_.state == ST_OPERATION_ENABLED) {
+    isMotorReset_ = false;
+    return true;
+  }
+  return false;
+}
+
 void ElmoMotorModule::resetPosCounter()
 {
   canopen_set_int('P','X', 0, 0);
@@ -166,6 +297,16 @@ void ElmoMotorModule::requestMotorStatus()
 {
   canOpenQuery('S', 'R', 0);
   canSync();
+}
+
+void ElmoMotorModule::checkMotorTimeout(const double & timeout)
+{
+  auto now = rclcpp::Clock().now();
+  if (motor_.status_recv_time < motor_.request_send_time &&
+    ((now - motor_.request_send_time).nanoseconds() * 1.0 / 1000000000.0) > timeout)
+  {
+    motor_.state = ST_MOTOR_FAILURE;
+  }
 }
 
 void ElmoMotorModule::canopen_set_int(

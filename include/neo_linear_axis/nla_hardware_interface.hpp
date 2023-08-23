@@ -29,6 +29,12 @@ public:
 private:
   double joint_position_commands_;
   double joint_position_;
+  double timeout_;
+  double homeVel_;
+  int homeDigIn_;
+
+  rclcpp::Clock clock_;
+  
   hardware_interface::HardwareInfo info_;
   std::unique_ptr<NeoLinearJoint> linear_joint_;
   motor_t motor;

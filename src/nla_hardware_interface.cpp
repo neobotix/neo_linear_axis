@@ -36,8 +36,14 @@ CallbackReturn NlaHardwareInterface::on_init(const hardware_interface::HardwareI
   }
 
   info_ = info;
+  
   // Get all the necessary parameters for the motors
   linear_joint_ = std::make_unique<NeoLinearJoint>(motor);
+  linear_joint_->setClock(clock_);
+  linear_joint_->setMotorTimeout(timeout_);
+  linear_joint_->setHomeVel(homeVel_);
+  linear_joint_->setHomeDigIn(homeDigIn_);
+
   return CallbackReturn::SUCCESS;
 }
 

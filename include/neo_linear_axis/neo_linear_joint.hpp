@@ -48,6 +48,12 @@ public:
   void initComms();
   void initMotor();
 
+  void setClock(rclcpp::Clock & clock);
+  void setMotorTimeout(double & timeout);
+  void updateMotor();
+  void setHomeVel(double & homeVel);
+  void setHomeDigIn(int & digin);
+
   // void sdoDownload(
   //   int & node_id, int32_t obj_index, int32_t obj_sub_index,
   //   int32_t data);
@@ -55,7 +61,12 @@ public:
   // float read_float(const can_msg_t & msg, int offset)
 private:
   motor_t motor_;
+  rclcpp::Clock clock_;
+  double motor_timeout_;
   std::shared_ptr<ElmoMotorModule> motorOp_;
+  double homeVel_;
+
+
 };
 
 #endif // NEO_LINEAR_AXIS__NEO_LINEAR_JOINT_HPP_
