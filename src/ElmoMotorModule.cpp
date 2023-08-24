@@ -222,8 +222,20 @@ void ElmoMotorModule::startHoming()
 
   beginMotion();
 
+  armHoming();
+
+  canSync();
+
   isHomed_ = false;
   isHoming_ = true;
+}
+
+void ElmoMotorModule::armHoming()
+{
+  motor_.homing_state = -1;    // reset state
+  motor_.homing_start_time = rclcpp::Clock().now();
+
+  canopen_set_int('H', 'M', 1, 1);   // arm homeing
 }
 
 void ElmoMotorModule::motorSetVel(double & rotVelRadS)
@@ -245,8 +257,53 @@ void ElmoMotorModule::setHomeDigIn(int & HomeDigIn)
   HomeDigIn_ = HomeDigIn;
 }
 
+void ElmoMotorModule::finishHoming()
+{
+  stopMotion();
+
+  // configureWatchdog();
+
+  isHomed_ = true;
+  isHoming_ = false;
+  isMotorReset_ = true;
+
+  // LastTrajectoryTime
+}
+
+bool ElmoMotorModule::isHoming()
+{
+  if (isHoming_) {
+    canOpenQuery('H', 'M', 1);  
+  }
+  return isHoming_;
+}
+
 bool ElmoMotorModule::isHomed()
 {
+  const rclcpp::Time now = rclcpp::Clock().now();
+
+  // Check to stop motor
+  if (motor_.homing_state == 1) {
+    stopMotion();
+  }
+
+  // Check for restart
+  if (motor_.homing_state == -2) {
+    armHoming();
+  }
+
+  // Check for timeout
+  if ((now - motor_.homing_start_time).seconds() > 20) {
+    std::cout<<"Homing timeout"<<std::endl; // later ROS log
+    armHoming();
+  }
+
+  if (motor_.homing_state != 2) {
+    isHomed_ = false;
+  } else {
+    isHomed_ = true;
+  }
+
   return isHomed_;
 }
 

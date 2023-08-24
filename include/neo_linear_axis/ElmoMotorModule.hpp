@@ -60,12 +60,15 @@ public:
   void stopMotion();
   bool isStopped();
   void setHomeDigIn(int & HomeDigIn);
+  bool isHoming();
+  void finishHoming();
 
 private:
   void canopen_set_int(char cmd_char_1, char cmd_char_2, int32_t index, int32_t data);
   void canOpenSDODownload(int32_t obj_index, int32_t obj_sub_index, int32_t data);
   void canOpenQuery(char cmd_char_1, char cmd_char_2, int32_t index);
   void motorSetVel(double & rotVelRadS);
+  void armHoming();
 
   motor_t motor_;
   bool waitForCanSock_ = false;

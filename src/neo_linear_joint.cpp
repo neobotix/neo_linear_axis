@@ -100,9 +100,21 @@ void NeoLinearJoint::updateMotor()
     std::cout<<"Linear joint is operational"<<std::endl;
   }
 
-  if (!motorOp_->isHomed()) {
+  // Start homing if not homed
+
+  if (!motorOp_->isHomed()) /**check if we need a sync counter later**/{
     motorOp_->setHomeVel(homeVel_);
     motorOp_->startHoming();
   }
-  
+
+  // Checking for homing status
+
+  if (!motorOp_->isHoming()) {
+    if (motorOp_->isOperational()) {
+      std::cout<<"Homing interrupted"<<std::endl;
+    } else if (motorOp_->isHomed()) {
+      std::cout<<"Homing Finished"<<std::endl;
+      motorOp_->finishHoming();
+    }
+  }
 }
