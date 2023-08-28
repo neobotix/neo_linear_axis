@@ -190,7 +190,7 @@ void ElmoMotorModule::startHoming()
     return;
   }
   stopMotion();
-  // disableWatchdog();
+  disableWatchdog();
 
   canopen_set_int('H', 'M', 1, 0);
   canSync();
@@ -257,11 +257,60 @@ void ElmoMotorModule::setHomeDigIn(int & HomeDigIn)
   HomeDigIn_ = HomeDigIn;
 }
 
+void ElmoMotorModule::setCommonMotorParams(
+  double & control_rate,
+  int & heartbeat_divider)
+{
+  control_rate_ = control_rate;
+  heartbeat_divider_ = heartbeat_divider;
+}
+
+void ElmoMotorModule::enableWatchdog()
+{
+  // configure to fail after missing 3 heartbeats
+  const int heartbeat_time_ms = 4 * 1000 * heartbeat_divider_ / control_rate_;
+  const int pc_node_id = 0x00;
+
+  // consumer (PC) heartbeat time
+  canOpenSDODownload(0x1016, 1, (pc_node_id << 16) | heartbeat_time_ms);
+
+  // error behavior after failure: 0=pre-operational, 1=no state change, 2=stopped"
+  canOpenSDODownload(0x1029, 1, 2);
+
+  canSync();
+
+  // motor behavior after heartbeat failure: "quick stop"
+  canOpenSDODownload(0x6007, 0, 3);
+
+  // activate emergency events: "heartbeat event"
+  // Object 0x2F21 = "Emergency Events" which cause an Emergency Message
+  // Bit 3 is responsible for Heartbeart-Failure.--> Hex 0x08
+  canOpenSDODownload(0x2F21, 0, 0x08);
+
+  canSync();
+}
+
+void ElmoMotorModule::disableWatchdog()
+{
+  // Motor action after Hearbeat-Error: No Action
+  canOpenSDODownload(0x6007, 0, 0);
+
+  // Error Behavior: No state change
+  canOpenSDODownload(0x1029, 1, 1);
+
+  // Deacivate emergency events: "heartbeat event"
+  // Object 0x2F21 = "Emergency Events" which cause an Emergency Message
+  // Bit 3 is responsible for Heartbeart-Failure.
+  canOpenSDODownload(0x2F21, 0, 0x00);
+
+  canSync();
+}
+
 void ElmoMotorModule::finishHoming()
 {
   stopMotion();
 
-  // configureWatchdog();
+  enableWatchdog();
 
   isHomed_ = true;
   isHoming_ = false;

@@ -32,6 +32,8 @@ private:
   double timeout_;
   double homeVel_;
   int homeDigIn_;
+  double control_rate_;
+  int heartbeat_divider_;
 
   rclcpp::Clock clock_;
   

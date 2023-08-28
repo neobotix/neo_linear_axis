@@ -62,6 +62,9 @@ public:
   void setHomeDigIn(int & HomeDigIn);
   bool isHoming();
   void finishHoming();
+  void setCommonMotorParams(
+    double & control_rate,
+    int & heartbeat_divider);
 
 private:
   void canopen_set_int(char cmd_char_1, char cmd_char_2, int32_t index, int32_t data);
@@ -69,6 +72,8 @@ private:
   void canOpenQuery(char cmd_char_1, char cmd_char_2, int32_t index);
   void motorSetVel(double & rotVelRadS);
   void armHoming();
+  void disableWatchdog();
+  void enableWatchdog();
 
   motor_t motor_;
   bool waitForCanSock_ = false;
@@ -87,5 +92,7 @@ private:
   int canSock_ = -1;
 
   double homeVel_;
+  int heartbeat_divider_;
+  double control_rate_;
 };
 #endif // NEO_LINEAR_AXIS__ELMO_MOTOR_MODULE_HPP_

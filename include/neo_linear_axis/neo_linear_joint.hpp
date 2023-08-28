@@ -53,6 +53,9 @@ public:
   void updateMotor();
   void setHomeVel(double & homeVel);
   void setHomeDigIn(int & digin);
+  void setCommonMotorParams(
+    double & control_rate,
+    int & heartbeat_divider);
 
   // void sdoDownload(
   //   int & node_id, int32_t obj_index, int32_t obj_sub_index,

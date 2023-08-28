@@ -43,6 +43,13 @@ void NeoLinearJoint::initComms()
   motorOp_->initializeNmt();
 }
 
+void NeoLinearJoint::setCommonMotorParams(
+  double & control_rate,
+  int & heartbeat_divider)
+{
+  motorOp_->setCommonMotorParams(control_rate, heartbeat_divider);
+}
+
 void NeoLinearJoint::initMotor()
 {
   motorOp_->motorOff();
