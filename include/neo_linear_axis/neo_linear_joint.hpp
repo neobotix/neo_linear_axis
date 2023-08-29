@@ -55,7 +55,9 @@ public:
   void setHomeDigIn(int & digin);
   void setCommonMotorParams(
     double & control_rate,
-    int & heartbeat_divider);
+    int & heartbeat_divider,
+    int & status_divider
+  );
 
   // void sdoDownload(
   //   int & node_id, int32_t obj_index, int32_t obj_sub_index,
@@ -68,8 +70,14 @@ private:
   double motor_timeout_;
   std::shared_ptr<ElmoMotorModule> motorOp_;
   double homeVel_;
-
-
+  double currPose_;
+  double currVel_;
+  double lookahead_time_;
+  double targetPose_;
+  double steerGain_;
+  int syncCounter_;
+  int heartbeatdivider_;
+  int statusdivider_;
 };
 
 #endif // NEO_LINEAR_AXIS__NEO_LINEAR_JOINT_HPP_

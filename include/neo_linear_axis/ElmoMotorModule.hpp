@@ -65,6 +65,9 @@ public:
   void setCommonMotorParams(
     double & control_rate,
     int & heartbeat_divider);
+  void sendSyncMsg();
+  void motorSetLinearJointVel(double & jointVel);
+  void sendHeartBeat();
 
 private:
   void canopen_set_int(char cmd_char_1, char cmd_char_2, int32_t index, int32_t data);

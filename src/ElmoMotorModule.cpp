@@ -252,6 +252,13 @@ void ElmoMotorModule::motorSetVel(double & rotVelRadS)
   canopen_set_int('J', 'V', 0, lim_motor_vel_inc_s);
 }
 
+void ElmoMotorModule::motorSetLinearJointVel(double & jointVel)
+{
+  // convert linear vel to rotational vel for linear hoints
+  double rotVel = 0.0; // ToDo
+  motorSetVel(rotVel);
+}
+
 void ElmoMotorModule::setHomeDigIn(int & HomeDigIn)
 {
   HomeDigIn_ = HomeDigIn;
@@ -263,6 +270,14 @@ void ElmoMotorModule::setCommonMotorParams(
 {
   control_rate_ = control_rate;
   heartbeat_divider_ = heartbeat_divider;
+}
+
+void ElmoMotorModule::sendHeartBeat()
+{
+  can_msg_t msg;        // send heartbeat message
+  msg.id = 0x700;
+  msg.length = 5;
+  transmitCan(msg);
 }
 
 void ElmoMotorModule::enableWatchdog()
@@ -403,6 +418,14 @@ void ElmoMotorModule::requestMotorStatus()
 {
   canOpenQuery('S', 'R', 0);
   canSync();
+}
+
+void ElmoMotorModule::sendSyncMsg()
+{
+  can_msg_t msg;
+  msg.id = 0x80;
+  msg.length = 0;
+  transmitCan(msg);
 }
 
 void ElmoMotorModule::checkMotorTimeout(const double & timeout)

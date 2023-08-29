@@ -43,7 +43,10 @@ CallbackReturn NlaHardwareInterface::on_init(const hardware_interface::HardwareI
   linear_joint_->setMotorTimeout(timeout_);
   linear_joint_->setHomeVel(homeVel_);
   linear_joint_->setHomeDigIn(homeDigIn_);
-  linear_joint_->setCommonMotorParams(control_rate_, heartbeat_divider_); // Setting dummy for now
+  linear_joint_->setCommonMotorParams(
+    control_rate_,
+    heartbeat_divider_,
+    status_divider_); // Setting dummy for now
 
   return CallbackReturn::SUCCESS;
 }

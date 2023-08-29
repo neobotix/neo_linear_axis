@@ -34,6 +34,7 @@ private:
   int homeDigIn_;
   double control_rate_;
   int heartbeat_divider_;
+  int status_divider_;
 
   rclcpp::Clock clock_;
   

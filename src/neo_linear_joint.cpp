@@ -45,8 +45,11 @@ void NeoLinearJoint::initComms()
 
 void NeoLinearJoint::setCommonMotorParams(
   double & control_rate,
-  int & heartbeat_divider)
+  int & heartbeat_divider,
+  int & status_divider)
 {
+  heartbeatdivider_ = heartbeat_divider;
+  statusdivider_ = status_divider;
   motorOp_->setCommonMotorParams(control_rate, heartbeat_divider);
 }
 
@@ -124,4 +127,50 @@ void NeoLinearJoint::updateMotor()
       motorOp_->finishHoming();
     }
   }
+
+  double futurePose = 0.0;
+  double poseDiff = 0.0;
+  double ctrlVel = 0.0;
+
+  if (currPose_ >= 2.0 || currPose_ <= 0.0) {
+    // Engage brakes    
+
+    // Set Motor Velocity 
+    ctrlVel = 0.0;
+    motorOp_->motorSetLinearJointVel(ctrlVel);
+  } else {
+    // Setting position and converting it to velocity commands
+    futurePose = currPose_ + currVel_ * lookahead_time_;
+    poseDiff = targetPose_ - futurePose;
+    ctrlVel = poseDiff * steerGain_;
+  }
+
+  if (abs(ctrlVel) > 0) {
+    // Disengage brakes - if engaged
+
+    // Set ctrlVel
+    motorOp_->motorSetLinearJointVel(ctrlVel); // Note : Convert rotational velocity to linear velocity
+    motorOp_->beginMotion();  
+  }
+  // } else {
+  //   // motorOp_->engageBrakes();
+  //   continue;
+  // }
+  
+  // Check for update timeout
+
+  motorOp_->sendSyncMsg();
+  motorOp_->sendHeartBeat();
+
+  // Status request checker
+  if (syncCounter_ % statusdivider_ == 0) {
+        motorOp_->requestMotorStatus();    // request status update
+  }
+
+  if (syncCounter_ % heartbeatdivider_ == 0) {
+    motorOp_->sendHeartBeat(); // Heartbeat of master to slave
+  }
+  // Heartbeat checker
+
+  syncCounter_++;
 }
