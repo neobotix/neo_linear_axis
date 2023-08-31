@@ -112,12 +112,12 @@ void ElmoMotorModule::transmitCan(const can_msg_t & msg)
   // wait for socket to be ready for writing
   if (waitForCanSock_) {
     std::unique_lock<std::mutex> lock(can_mutex_);
-    while (doRun_ && canSock_ < 0) {
+    while (canSock_ < 0) {
       can_condtion_.wait(lock);
     }
   }
 
-  if (!doRun_) {
+  if (shutdown_) {
     throw std::runtime_error("shutdown");
   }
 
@@ -133,6 +133,29 @@ void ElmoMotorModule::transmitCan(const can_msg_t & msg)
       throw std::logic_error("write() buffer overflow!");
     }
   }
+}
+
+void ElmoMotorModule::shutdown()
+{
+  {
+    // std::lock_guard<std::mutex> lock(m_node_mutex);
+
+    // disable waiting for CAN socket, since we are shutting down
+    waitForCanSock_ = false;
+    shutdown_ = true;
+  }
+  {
+    // std::lock_guard<std::mutex> lock(m_can_mutex);
+    if (canSock_ >= 0) {
+      ::close(canSock_);
+      canSock_ = -1;
+    }
+  }
+}
+
+void ElmoMotorModule::setCanIface(std::string & canIface)
+{
+  canIface_ = canIface;
 }
 
 void ElmoMotorModule::setMotorModulo()
@@ -478,4 +501,102 @@ void ElmoMotorModule::canOpenQuery(
 void ElmoMotorModule::canSync()
 {
   ::usleep(10000);    // workaround, sleep for around 10 msgs
+}
+
+bool ElmoMotorModule::isSocketOpened()
+{
+  return sockStatus_;
+}
+
+void ElmoMotorModule::openSocket()
+{
+  if (!isError_ || canSock_ < 0) {
+    if (canSock_ >= 0) {
+      ::close(canSock_); // close first
+    }
+    try {
+      // Open Socket
+      canSock_ = ::socket(PF_CAN, SOCK_RAW, CAN_RAW);
+      if (canSock_ < 0) {
+        throw std::runtime_error("socket() failed!");
+      }
+      ::ifreq ifr = {};
+      ::strncpy(ifr.ifr_name, canIface_.c_str(), IFNAMSIZ);
+
+      if (::ioctl(canSock_, SIOCGIFINDEX, &ifr) < 0) {
+        throw std::runtime_error("ioctl() failed!");
+      }
+
+      // bind to interface
+      ::sockaddr_can addr = {};
+      addr.can_family = AF_CAN;
+      addr.can_ifindex = ifr.ifr_ifindex;
+      
+      if (::bind(canSock_, (::sockaddr *)(&addr), sizeof(addr)) < 0) {
+        throw std::runtime_error("bind() failed!");
+      }
+
+      // RCLCPP_INFO_STREAM(
+      //   this->get_logger(), "CAN interface '" << canIface_ << "' opened successfully.");
+      sockStatus_ = true;
+      isError_ = false;
+    } catch (const std::exception & ex) {
+      // RCLCPP_WARN_STREAM(
+      //   this->get_logger(), "Failed to open CAN interface '" << canIface << "': "
+      //                                                        << ex.what() << " (" <<
+      //     ::strerror(errno) << ")");
+      isError_ = true;
+      return;
+    }
+    can_condtion_.notify_all();  // notify that socket is ready
+  }
+}
+
+void ElmoMotorModule::readMotor()
+{
+  if (isError_) {
+    ::close(canSock_);
+    sockStatus_ = false;
+    ::usleep(1000 * 1000);  // in case of error sleep some time
+    canSock_ = -1;
+    can_condtion_.notify_all();
+    return;
+  }
+  // read a frame
+  ::can_frame frame = {};
+  const auto res = ::read(canSock_, &frame, sizeof(frame));
+  if (res != sizeof(frame)) {
+    // RCLCPP_WARN_STREAM(this->get_logger(), "read() failed with " << ::strerror(errno));
+    return;
+  }
+
+  // convert frame
+  can_msg_t msg;
+  msg.id = frame.can_id & 0x1FFFFFFF;
+  msg.length = frame.can_dlc;
+  for (int i = 0; i < frame.can_dlc; ++i) {
+    msg.data[i] = frame.data[i];
+  }
+
+  // process it
+  {
+  //   std::lock_guard<std::mutex> lock(m_node_mutex);
+    waitForCanSock_ = false;    // disable waiting for transmit (avoid dead-lock)
+    try {
+      // handle(msg);
+    } catch (const std::exception & ex) {
+      // RCLCPP_WARN_STREAM(this->get_logger(), ex.what());
+    }
+    waitForCanSock_ = true;     // enable waiting again
+  }
+
+  // close socket
+  {
+    // std::lock_guard<std::mutex> lock(m_can_mutex);
+    if (canSock_ >= 0) {
+      ::close(canSock_);
+      canSock_ = -1;
+    }
+    can_condtion_.notify_all();     // notify that socket is closed
+  }
 }

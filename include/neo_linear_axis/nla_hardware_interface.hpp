@@ -35,6 +35,7 @@ private:
   double control_rate_;
   int heartbeat_divider_;
   int status_divider_;
+  std::string canIface_;
 
   rclcpp::Clock clock_;
   

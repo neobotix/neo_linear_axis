@@ -58,6 +58,11 @@ public:
     int & heartbeat_divider,
     int & status_divider
   );
+  bool isSocketOpened();
+  void openSocket();  
+  void setCanIface(std::string & canIface);
+  void readMotor();
+  void shutdown();
 
   // void sdoDownload(
   //   int & node_id, int32_t obj_index, int32_t obj_sub_index,

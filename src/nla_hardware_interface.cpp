@@ -47,6 +47,7 @@ CallbackReturn NlaHardwareInterface::on_init(const hardware_interface::HardwareI
     control_rate_,
     heartbeat_divider_,
     status_divider_); // Setting dummy for now
+  linear_joint_->setCanIface(canIface_); // Setting dummy for now
 
   return CallbackReturn::SUCCESS;
 }
@@ -100,6 +101,9 @@ std::vector<hardware_interface::CommandInterface> NlaHardwareInterface::export_c
 
 return_type NlaHardwareInterface::read(const rclcpp::Time &, const rclcpp::Duration &)
 {
+  if (!linear_joint_->isSocketOpened()) {
+    linear_joint_->openSocket();
+  }
   return return_type::OK;
 }
 

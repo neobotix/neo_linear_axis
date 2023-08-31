@@ -70,6 +70,11 @@ void NeoLinearJoint::initMotor()
 
 }
 
+void NeoLinearJoint::setCanIface(std::string & canIface)
+{
+  motorOp_->setCanIface(canIface);
+}
+
 void NeoLinearJoint::setClock(rclcpp::Clock & clock)
 {
   clock_ = clock;
@@ -90,6 +95,26 @@ void NeoLinearJoint::setHomeVel(double & homeVel)
 void NeoLinearJoint::setHomeDigIn(int & digIn)
 {
   motorOp_->setHomeDigIn(digIn);
+}
+
+bool NeoLinearJoint::isSocketOpened()
+{
+ return motorOp_->isSocketOpened();
+}
+
+void NeoLinearJoint::openSocket()
+{
+  motorOp_->openSocket();
+}
+
+void NeoLinearJoint::readMotor()
+{
+  motorOp_->readMotor();
+}
+
+void NeoLinearJoint::shutdown()
+{
+  motorOp_->shutdown();
 }
 
 void NeoLinearJoint::updateMotor()

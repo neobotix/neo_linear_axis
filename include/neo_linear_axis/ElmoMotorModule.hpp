@@ -26,6 +26,7 @@ SOFTWARE.
 #include <neo_linear_axis/motor.hpp>
 #include <linux/can.h>
 #include <linux/can/raw.h>
+#include <net/if.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -68,6 +69,11 @@ public:
   void sendSyncMsg();
   void motorSetLinearJointVel(double & jointVel);
   void sendHeartBeat();
+  bool isSocketOpened();
+  void openSocket();
+  void setCanIface(std::string & canIface);
+  void readMotor();
+  void shutdown();
 
 private:
   void canopen_set_int(char cmd_char_1, char cmd_char_2, int32_t index, int32_t data);
@@ -87,6 +93,7 @@ private:
   bool isHomed_ = false;
   bool isHoming_ = false;
   bool isStopped_ = true;
+  bool sockStatus_ = false;
   int HomeDigIn_;
 
   volatile bool doRun_ = true;
@@ -97,5 +104,9 @@ private:
   double homeVel_;
   int heartbeat_divider_;
   double control_rate_;
+
+  bool isError_ = false;
+  std::string canIface_;
+  bool shutdown_=false;
 };
 #endif // NEO_LINEAR_AXIS__ELMO_MOTOR_MODULE_HPP_
