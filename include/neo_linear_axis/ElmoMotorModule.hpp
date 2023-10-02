@@ -50,6 +50,7 @@ public:
   void motorOff();
   void requestMotorStatus();
   void checkMotorTimeout(const double & timeout);
+  void motorSetVel(double & rotVelRadS);
   void setClock(rclcpp::Clock & clock);
   bool isReset();
   bool isOperational();
@@ -67,7 +68,7 @@ public:
     double & control_rate,
     int & heartbeat_divider);
   void sendSyncMsg();
-  void motorSetLinearJointVel(double & jointVel);
+  // void motorSetLinearJointVel(double & jointVel);
   void sendHeartBeat();
   bool isSocketOpened();
   void openSocket();
@@ -75,14 +76,25 @@ public:
   void readMotor();
   void shutdown();
 
+  int32_t getEncData();
+
 private:
   void canopen_set_int(char cmd_char_1, char cmd_char_2, int32_t index, int32_t data);
   void canOpenSDODownload(int32_t obj_index, int32_t obj_sub_index, int32_t data);
   void canOpenQuery(char cmd_char_1, char cmd_char_2, int32_t index);
-  void motorSetVel(double & rotVelRadS);
   void armHoming();
   void disableWatchdog();
   void enableWatchdog();
+  void handle(const can_msg_t & msg);
+  void handlePDO1(const can_msg_t & msg);
+  void handlePDO2(const can_msg_t & msg);
+  void evalStatus(int32_t prev_status);
+  void evaluateFailure(int32_t prev_status);
+  int32_t read_int32(const can_msg_t & msg, int offset) const;
+  float read_float(const can_msg_t & msg, int offset) const;
+
+  // double calcAngularPos() const;
+  // double calcAngularVel() const;
 
   motor_t motor_;
   bool waitForCanSock_ = false;

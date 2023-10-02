@@ -117,6 +117,20 @@ void NeoLinearJoint::shutdown()
   motorOp_->shutdown();
 }
 
+void NeoLinearJoint::getJointPos(double & joint_position)
+{
+  auto joint_pos = motorOp_->getEncData();
+  // Todo: Convert the joint position to linear scale
+  joint_position = joint_pos;
+}
+
+void NeoLinearJoint::setJointPos(double & joint_position)
+{
+  auto linear_pos = joint_position;
+  // Todo: Convert the linear position to joint position
+  currPose_ = joint_position; 
+}
+
 void NeoLinearJoint::updateMotor()
 {
   // Check for motor timeouts
@@ -150,6 +164,7 @@ void NeoLinearJoint::updateMotor()
     } else if (motorOp_->isHomed()) {
       std::cout<<"Homing Finished"<<std::endl;
       motorOp_->finishHoming();
+      motorOp_->motorOff();
     }
   }
 
@@ -162,7 +177,7 @@ void NeoLinearJoint::updateMotor()
 
     // Set Motor Velocity 
     ctrlVel = 0.0;
-    motorOp_->motorSetLinearJointVel(ctrlVel);
+    motorOp_->motorSetVel(ctrlVel);
   } else {
     // Setting position and converting it to velocity commands
     futurePose = currPose_ + currVel_ * lookahead_time_;
@@ -170,32 +185,46 @@ void NeoLinearJoint::updateMotor()
     ctrlVel = poseDiff * steerGain_;
   }
 
-  if (abs(ctrlVel) > 0) {
-    // Disengage brakes - if engaged
-
+  if (abs(ctrlVel) > 0.000 || currPose_ != lastPose_) {
+    // Turning on the motor disengages the brake
+    if (!motorOp_->isOperational()) {
+      motorOp_->motorOn();
+    } else {
+      std::cout<<"Motor is already switched on"<<std::endl;
+    }
+    
     // Set ctrlVel
-    motorOp_->motorSetLinearJointVel(ctrlVel); // Note : Convert rotational velocity to linear velocity
+    motorOp_->motorSetVel(ctrlVel); // Note : Convert rotational velocity to linear velocity
     motorOp_->beginMotion();  
+    // Check for update timeout
+
+    motorOp_->sendSyncMsg();
+    motorOp_->sendHeartBeat();
+
+    // Status request checker
+    if (syncCounter_ % statusdivider_ == 0) {
+          motorOp_->requestMotorStatus();    // request status update
+    }
+
+    if (syncCounter_ % heartbeatdivider_ == 0) {
+      motorOp_->sendHeartBeat(); // Heartbeat of master to slave
+    }
+    // Heartbeat checker
+
+    syncCounter_++;
+    lastPose_ = currPose_;
+  } else {
+    if (motorOp_->isOperational()) {
+      motorOp_->motorOff();  
+    } else {
+      std::cout<<"Motor is already switched off"<<std::endl;
+    }
+    
   }
   // } else {
   //   // motorOp_->engageBrakes();
   //   continue;
   // }
   
-  // Check for update timeout
-
-  motorOp_->sendSyncMsg();
-  motorOp_->sendHeartBeat();
-
-  // Status request checker
-  if (syncCounter_ % statusdivider_ == 0) {
-        motorOp_->requestMotorStatus();    // request status update
-  }
-
-  if (syncCounter_ % heartbeatdivider_ == 0) {
-    motorOp_->sendHeartBeat(); // Heartbeat of master to slave
-  }
-  // Heartbeat checker
-
-  syncCounter_++;
+  
 }

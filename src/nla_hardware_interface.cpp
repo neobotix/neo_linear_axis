@@ -104,11 +104,16 @@ return_type NlaHardwareInterface::read(const rclcpp::Time &, const rclcpp::Durat
   if (!linear_joint_->isSocketOpened()) {
     linear_joint_->openSocket();
   }
+  linear_joint_->readMotor();
+  linear_joint_->getJointPos(joint_position_);
   return return_type::OK;
 }
 
 return_type NlaHardwareInterface::write(const rclcpp::Time &, const rclcpp::Duration &)
 {
+  linear_joint_->setJointPos(joint_position_commands_);
+  linear_joint_->updateMotor();
+
   return return_type::OK;
 }
 

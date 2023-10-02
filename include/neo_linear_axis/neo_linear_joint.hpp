@@ -63,6 +63,8 @@ public:
   void setCanIface(std::string & canIface);
   void readMotor();
   void shutdown();
+  void getJointPos(double & joint_position);
+  void setJointPos(double & joint_position);
 
   // void sdoDownload(
   //   int & node_id, int32_t obj_index, int32_t obj_sub_index,
@@ -75,11 +77,12 @@ private:
   double motor_timeout_;
   std::shared_ptr<ElmoMotorModule> motorOp_;
   double homeVel_;
-  double currPose_;
-  double currVel_;
+  double currPose_ = 0.0;
+  double currVel_ = 0.0;
   double lookahead_time_;
-  double targetPose_;
-  double steerGain_;
+  double targetPose_ = 0.0;
+  double steerGain_ = 0.0;
+  double lastPose_ = 0.0;
   int syncCounter_;
   int heartbeatdivider_;
   int statusdivider_;
