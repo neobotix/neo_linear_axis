@@ -117,18 +117,18 @@ void NeoLinearJoint::shutdown()
   motorOp_->shutdown();
 }
 
+// Gives back the linear position of the joint
 void NeoLinearJoint::getJointPos(double & joint_position)
 {
-  auto joint_pos = motorOp_->getEncData();
-  // Todo: Convert the joint position to linear scale
-  joint_position = joint_pos;
+  currPose_ = motorOp_->getPose();
+  last_update_time_ = rclcpp::Clock().now();
+  joint_position = currPose_;
 }
 
+// sets the linear position of the joint
 void NeoLinearJoint::setJointPos(double & joint_position)
 {
-  auto linear_pos = joint_position;
-  // Todo: Convert the linear position to joint position
-  currPose_ = joint_position; 
+  targetPose_ = joint_position ;
 }
 
 void NeoLinearJoint::updateMotor()
@@ -171,35 +171,49 @@ void NeoLinearJoint::updateMotor()
   double futurePose = 0.0;
   double poseDiff = 0.0;
   double ctrlVel = 0.0;
+  double linearVel = 0.0;
+  currVel_ = motorOp_->getVel();
 
   if (currPose_ >= 2.0 || currPose_ <= 0.0) {
     // Engage brakes    
 
     // Set Motor Velocity 
-    ctrlVel = 0.0;
-    motorOp_->motorSetVel(ctrlVel);
+    linearVel = 0.0;
+    motorOp_->motorSetVel(linearVel);
   } else {
     // Setting position and converting it to velocity commands
     futurePose = currPose_ + currVel_ * lookahead_time_;
     poseDiff = targetPose_ - futurePose;
-    ctrlVel = poseDiff * steerGain_;
+    linearVel = poseDiff * steerGain_;
   }
 
-  if (abs(ctrlVel) > 0.000 || currPose_ != lastPose_) {
+  if (abs(linearVel) > 0.000 || currPose_ != lastPose_) {
     // Turning on the motor disengages the brake
     if (!motorOp_->isOperational()) {
       motorOp_->motorOn();
     } else {
       std::cout<<"Motor is already switched on"<<std::endl;
     }
-    
+
     // Set ctrlVel
-    motorOp_->motorSetVel(ctrlVel); // Note : Convert rotational velocity to linear velocity
+    ctrlVel = linearVel;
+
+    motorOp_->motorSetVel(ctrlVel);
     motorOp_->beginMotion();  
+    syncCounter_++;
+
     // Check for update timeout
+    if(last_update_time_ < last_sync_time_) {
+      if (motorOp_->isHomed()) {
+        // warn
+        // RCLCPP_WARN(this->get_logger(), "Sync update timeout");
+      }
+    }
 
     motorOp_->sendSyncMsg();
     motorOp_->sendHeartBeat();
+
+    last_sync_time_ = rclcpp::Clock().now();
 
     // Status request checker
     if (syncCounter_ % statusdivider_ == 0) {
@@ -211,7 +225,6 @@ void NeoLinearJoint::updateMotor()
     }
     // Heartbeat checker
 
-    syncCounter_++;
     lastPose_ = currPose_;
   } else {
     if (motorOp_->isOperational()) {
@@ -221,10 +234,5 @@ void NeoLinearJoint::updateMotor()
     }
     
   }
-  // } else {
-  //   // motorOp_->engageBrakes();
-  //   continue;
-  // }
-  
   
 }

@@ -261,11 +261,11 @@ void ElmoMotorModule::armHoming()
   canopen_set_int('H', 'M', 1, 1);   // arm homeing
 }
 
-void ElmoMotorModule::motorSetVel(double & rotVelRadS)
+void ElmoMotorModule::motorSetVel(double & linVelms)
 {
-  const double motor_vel_rev_s = motor_.gear_ratio * rotVelRadS / (2 * M_PI);
-  const int32_t motor_vel_inc_s = motor_.rot_sign *
-    static_cast<int>(motor_vel_rev_s * motor_.enc_ticks_per_rev);
+  const double motor_vel_rev_s = motor_.gear_ratio * linVelms;
+  const int32_t motor_vel_inc_s = static_cast<int>(motor_vel_rev_s * motor_.enc_ticks_per_rev);
+
   const int32_t lim_motor_vel_inc_s = std::min(
     std::max(
       motor_vel_inc_s,
@@ -274,13 +274,6 @@ void ElmoMotorModule::motorSetVel(double & rotVelRadS)
 
   canopen_set_int('J', 'V', 0, lim_motor_vel_inc_s);
 }
-
-// void ElmoMotorModule::motorSetLinearJointVel(double & jointVel)
-// {
-//   // convert linear vel to rotational vel for linear hoints
-//   double rotVel = 0.0; // ToDo
-//   motorSetVel(rotVel);
-// }
 
 void ElmoMotorModule::setHomeDigIn(int & HomeDigIn)
 {
@@ -353,8 +346,6 @@ void ElmoMotorModule::finishHoming()
   isHomed_ = true;
   isHoming_ = false;
   isMotorReset_ = true;
-
-  // LastTrajectoryTime
 }
 
 bool ElmoMotorModule::isHoming()
@@ -613,17 +604,31 @@ void ElmoMotorModule::handle(const can_msg_t & msg)
     handlePDO2(msg);
   }
 
-  // if (motor_.update_recv_time > m_last_sync_time) {
-  //   wheel.curr_wheel_pos = calc_wheel_pos(wheel.drive);
-  //   wheel.curr_wheel_vel = calc_wheel_vel(wheel.drive);
-  //   num_motor_updates++;
-  // }
+  if (motor_.update_recv_time > last_sync_time_) {
+    curr_pos_ = currPose();
+    curr_vel_ = currVel();
+    num_motor_updates++;
+  } else {
+    curr_pos_ = -1.0;
+    curr_vel_ = -1.0;
+    // Log timeout
+  }
 
 }
 
-int32_t ElmoMotorModule::getEncData()
+void ElmoMotorModule::setSyncTime(rclcpp::Time last_sync_time)
 {
-  return motor_.curr_enc_pos_inc;
+  last_sync_time_ = last_sync_time;
+}
+
+double ElmoMotorModule::getPose()
+{
+  return curr_pos_;
+}
+
+double ElmoMotorModule::getVel()
+{
+  return curr_vel_;
 }
 
 void ElmoMotorModule::handlePDO1(const can_msg_t & msg)
@@ -668,17 +673,17 @@ void ElmoMotorModule::handlePDO2(const can_msg_t & msg)
   }
 }
 
-// double ElmoMotorModule::calcAngularPos() const
-// {
-//   return 2 * M_PI * static_cast<double>(motor_.rot_sign * motor_.curr_enc_pos_inc) /
-//          motor_.enc_ticks_per_rev / motor_.gear_ratio;
-// }
+double ElmoMotorModule::currPose()
+{
+  return static_cast<double>(motor_.meters_per_revolution * motor_.curr_enc_pos_inc) /
+         motor_.enc_ticks_per_rev / motor_.gear_ratio;
+}
 
-// double ElmoMotorModule::calcAngularVel() const
-// {
-//   return 2 * M_PI * static_cast<double>(motor_.rot_sign * motor_.curr_enc_vel_inc_s) /
-//          motor_.enc_ticks_per_rev / motor_.gear_ratio;
-// }
+double ElmoMotorModule::currVel()
+{
+  return static_cast<double>(motor_.meters_per_revolution * motor_.curr_enc_vel_inc_s) /
+         motor_.enc_ticks_per_rev / motor_.gear_ratio;
+}
 
 int32_t ElmoMotorModule::read_int32(const can_msg_t & msg, int offset) const
 {

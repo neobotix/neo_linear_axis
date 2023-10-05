@@ -74,6 +74,10 @@ public:
 private:
   motor_t motor_;
   rclcpp::Clock clock_;
+
+  rclcpp::Time last_update_time_;
+  rclcpp::Time last_sync_time_;
+
   double motor_timeout_;
   std::shared_ptr<ElmoMotorModule> motorOp_;
   double homeVel_;

@@ -50,7 +50,7 @@ public:
   void motorOff();
   void requestMotorStatus();
   void checkMotorTimeout(const double & timeout);
-  void motorSetVel(double & rotVelRadS);
+  void motorSetVel(double & linVelms);
   void setClock(rclcpp::Clock & clock);
   bool isReset();
   bool isOperational();
@@ -68,15 +68,15 @@ public:
     double & control_rate,
     int & heartbeat_divider);
   void sendSyncMsg();
-  // void motorSetLinearJointVel(double & jointVel);
   void sendHeartBeat();
   bool isSocketOpened();
   void openSocket();
   void setCanIface(std::string & canIface);
   void readMotor();
   void shutdown();
-
-  int32_t getEncData();
+  double getPose();
+  double getVel();
+  void setSyncTime(rclcpp::Time last_sync_time);
 
 private:
   void canopen_set_int(char cmd_char_1, char cmd_char_2, int32_t index, int32_t data);
@@ -92,9 +92,9 @@ private:
   void evaluateFailure(int32_t prev_status);
   int32_t read_int32(const can_msg_t & msg, int offset) const;
   float read_float(const can_msg_t & msg, int offset) const;
+  double currPose();
+  double currVel();
 
-  // double calcAngularPos() const;
-  // double calcAngularVel() const;
 
   motor_t motor_;
   bool waitForCanSock_ = false;
@@ -107,6 +107,7 @@ private:
   bool isStopped_ = true;
   bool sockStatus_ = false;
   int HomeDigIn_;
+  rclcpp::Time last_sync_time_;
 
   volatile bool doRun_ = true;
 
@@ -114,6 +115,8 @@ private:
   int canSock_ = -1;
 
   double homeVel_;
+  double curr_pos_ = 0.0;
+  double curr_vel_ = 0.0;
   int heartbeat_divider_;
   double control_rate_;
 
