@@ -95,7 +95,7 @@ CallbackReturn NlaHardwareInterface::on_configure(const rclcpp_lifecycle::State 
   return CallbackReturn::SUCCESS; 
 }
 
-CallbackReturn NlaHardwareInterface::on_activate(const hardware_interface::HardwareInfo & info)
+CallbackReturn NlaHardwareInterface::on_activate(const rclcpp_lifecycle::State & /*info*/)
 {
   // Starting the motors
   RCLCPP_INFO(logger_, "Initializing motors");

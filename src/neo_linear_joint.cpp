@@ -41,6 +41,7 @@ void NeoLinearJoint::initComms()
 {
   RCLCPP_INFO(logger_, "Initializing communication");
   motorOp_->initializeNmt();
+  ::usleep(100 * 1000);
 }
 
 void NeoLinearJoint::setCommonMotorParams(

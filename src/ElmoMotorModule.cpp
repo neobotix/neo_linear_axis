@@ -146,7 +146,7 @@ void ElmoMotorModule::shutdown()
     shutdown_ = true;
   }
   {
-    // std::lock_guard<std::mutex> lock(m_can_mutex);
+    std::unique_lock<std::mutex> lock(can_mutex_);
     if (canSock_ >= 0) {
       ::close(canSock_);
       canSock_ = -1;
@@ -465,7 +465,7 @@ void ElmoMotorModule::canopen_set_int(
   int32_t data)
 {
   can_msg_t msg;
-  msg.id = motor_.node_id;
+  msg.id = motor_.can_Rx_PDO2;
   msg.length = 8;
   msg.data[0] = cmd_char_1;
   msg.data[1] = cmd_char_2;
@@ -485,7 +485,7 @@ void ElmoMotorModule::canOpenQuery(
   int32_t index)
 {
   can_msg_t msg;
-  msg.id = motor_.node_id;
+  msg.id = motor_.can_Rx_PDO2;
   msg.length = 8;
   msg.data[0] = cmd_char_1;
   msg.data[1] = cmd_char_2;
@@ -559,6 +559,7 @@ void ElmoMotorModule::readMotor()
 {
   // close socket if error
   if (isError_) {
+    std::unique_lock<std::mutex> lock(can_mutex_);
     ::close(canSock_);
     sockStatus_ = false;
     ::usleep(1000 * 1000);  // in case of error sleep some time
@@ -585,7 +586,6 @@ void ElmoMotorModule::readMotor()
 
   // process it
   {
-  //   std::lock_guard<std::mutex> lock(m_node_mutex);
     waitForCanSock_ = false;    // disable waiting for transmit (avoid dead-lock)
     try {
       handle(msg);

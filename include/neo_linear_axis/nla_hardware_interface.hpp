@@ -18,7 +18,7 @@ class NlaHardwareInterface : public hardware_interface::SystemInterface
 public:
   CallbackReturn on_init(const hardware_interface::HardwareInfo & info) override;
   CallbackReturn on_configure(const rclcpp_lifecycle::State & /*info*/) override;
-  CallbackReturn on_activate(const hardware_interface::HardwareInfo & /*info*/);
+  CallbackReturn on_activate(const rclcpp_lifecycle::State & /*info*/) override;
   CallbackReturn on_deactivate(const rclcpp_lifecycle::State & /*info*/);
   std::vector<hardware_interface::StateInterface> export_state_interfaces() override;
   std::vector<hardware_interface::CommandInterface> export_command_interfaces() override;
