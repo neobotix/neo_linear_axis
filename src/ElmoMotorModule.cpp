@@ -429,6 +429,11 @@ void ElmoMotorModule::motorOff()
   canSync();
 }
 
+void ElmoMotorModule::setDigitalInput()
+{
+  canopen_set_int('I', 'L', 1, 7);
+}
+
 void ElmoMotorModule::requestMotorStatus()
 {
   canOpenQuery('S', 'R', 0);
@@ -676,6 +681,9 @@ void ElmoMotorModule::handlePDO2(const can_msg_t & msg)
   }
   if (msg.data[0] == 'I' && msg.data[1] == 'Q') {
     motor_.curr_torque = read_float(msg, 4) * motor_.torque_constant;
+  }
+  if (msg.data[0] == 'I' && msg.data[1] == 'P') {
+    RCLCPP_INFO(logger_, "Got digital input info");
   }
 }
 

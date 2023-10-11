@@ -65,6 +65,7 @@ void NeoLinearJoint::initMotor()
   motorOp_->configurePDOMapping();
   motorOp_->motorOn();
   motorOp_->requestMotorStatus();
+  motorOp_->setDigitalInput();
 
   /*show error if any in the above initialization step*/
 
