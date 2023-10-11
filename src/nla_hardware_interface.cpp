@@ -34,11 +34,39 @@ CallbackReturn NlaHardwareInterface::on_init(const hardware_interface::HardwareI
   if (hardware_interface::SystemInterface::on_init(info) != hardware_interface::CallbackReturn::SUCCESS) {
     return hardware_interface::CallbackReturn::ERROR;
   }
-
-  info_ = info;
   
+  if (info_.hardware_parameters.count("can_iface") > 0) {
+    canIface_ = info_.hardware_parameters.at("can_iface");
+  } else {
+    RCLCPP_WARN(logger_, "can_iface not specified in the URDF.");
+  }
+
+  if (info_.hardware_parameters.count("timeout") > 0) {
+    timeout_ = std::stod(info_.hardware_parameters.at("timeout"));
+  } else {
+    RCLCPP_WARN(logger_, "motor timeout not specified in the URDF.");
+  }
+
+  if (info_.hardware_parameters.count("homeVel") > 0) {
+    homeVel_ = std::stod(info_.hardware_parameters.at("homeVel"));
+  } else {
+    RCLCPP_WARN(logger_, "Homing velocity not specified in the URDF.");
+  }
+
+  if (info_.hardware_parameters.count("control_rate") > 0) {
+    control_rate_ = std::stod(info_.hardware_parameters.at("control_rate"));
+  } else {
+    RCLCPP_WARN(logger_, "control_rate not specified in the URDF.");
+  }
+
+  if (info_.hardware_parameters.count("homeDigIn") > 0) {
+    homeDigIn_ = std::stoi(info_.hardware_parameters.at("homeDigIn"));
+  } else {
+    RCLCPP_WARN(logger_, "Digital input not specified in the URDF.");
+  }
+
   // Get all the necessary parameters for the motors
-  linear_joint_ = std::make_unique<NeoLinearJoint>(motor);
+  linear_joint_ = std::make_unique<NeoLinearJoint>(motor, logger_);
   linear_joint_->setClock(clock_);
   linear_joint_->setMotorTimeout(timeout_);
   linear_joint_->setHomeVel(homeVel_);
@@ -54,23 +82,31 @@ CallbackReturn NlaHardwareInterface::on_init(const hardware_interface::HardwareI
 
 CallbackReturn NlaHardwareInterface::on_configure(const rclcpp_lifecycle::State & /*info*/)
 {
-  // Comms initialization
-  linear_joint_->initComms();
+  if (!linear_joint_->isSocketOpened()) {
+    // Comms initialization
+    bool socketError;
+    linear_joint_->openSocket();
+    linear_joint_->checkSocketError(socketError);
+    if (socketError) {
+      return CallbackReturn::ERROR;
+    }
+    linear_joint_->initComms();
+  }
   return CallbackReturn::SUCCESS; 
 }
 
-CallbackReturn NlaHardwareInterface::on_activate(const hardware_interface::HardwareInfo & /*info*/)
+CallbackReturn NlaHardwareInterface::on_activate(const hardware_interface::HardwareInfo & info)
 {
+  // Starting the motors
+  RCLCPP_INFO(logger_, "Initializing motors");
   linear_joint_->initMotor();
   return CallbackReturn::SUCCESS;
 }
-
 
 CallbackReturn NlaHardwareInterface::on_deactivate(const rclcpp_lifecycle::State & /*info*/)
 {
   return CallbackReturn::SUCCESS;
 }
-
 
 std::vector<hardware_interface::StateInterface> NlaHardwareInterface::export_state_interfaces()
 {
@@ -101,9 +137,6 @@ std::vector<hardware_interface::CommandInterface> NlaHardwareInterface::export_c
 
 return_type NlaHardwareInterface::read(const rclcpp::Time &, const rclcpp::Duration &)
 {
-  if (!linear_joint_->isSocketOpened()) {
-    linear_joint_->openSocket();
-  }
   linear_joint_->readMotor();
   linear_joint_->getJointPos(joint_position_);
   return return_type::OK;

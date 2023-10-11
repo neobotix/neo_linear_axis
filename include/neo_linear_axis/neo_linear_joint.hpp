@@ -27,6 +27,7 @@ SOFTWARE.
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include "rclcpp/rclcpp.hpp"
 
 #include <neo_linear_axis/can_msg.hpp>
 #include <neo_linear_axis/motor.hpp>
@@ -42,7 +43,7 @@ class NeoLinearJoint
 {
 public:
   // Defining constructor, later will be updated with args
-  NeoLinearJoint(motor_t motor);
+  NeoLinearJoint(motor_t motor, rclcpp::Logger logger);
   ~NeoLinearJoint();
 
   void initComms();
@@ -65,6 +66,7 @@ public:
   void shutdown();
   void getJointPos(double & joint_position);
   void setJointPos(double & joint_position);
+  void checkSocketError(bool & isError);
 
   // void sdoDownload(
   //   int & node_id, int32_t obj_index, int32_t obj_sub_index,
@@ -83,13 +85,13 @@ private:
   double homeVel_;
   double currPose_ = 0.0;
   double currVel_ = 0.0;
-  double lookahead_time_;
+  double lookahead_time_ = 0.0; // hardcoding the values
   double targetPose_ = 0.0;
-  double steerGain_ = 0.0;
-  double lastPose_ = 0.0;
+  double pGain_ = 0.0; // hardcoding the values
   int syncCounter_;
   int heartbeatdivider_;
   int statusdivider_;
+  rclcpp::Logger logger_;
 };
 
 #endif // NEO_LINEAR_AXIS__NEO_LINEAR_JOINT_HPP_

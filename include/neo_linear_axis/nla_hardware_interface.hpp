@@ -25,6 +25,7 @@ public:
 
   return_type read(const rclcpp::Time &, const rclcpp::Duration &) override;
   return_type write(const rclcpp::Time &, const rclcpp::Duration &) override;
+  rclcpp::Logger logger_{rclcpp::get_logger("neo_linear_axis")};
 
 private:
   double joint_position_commands_;
@@ -33,13 +34,12 @@ private:
   double homeVel_;
   int homeDigIn_;
   double control_rate_;
-  int heartbeat_divider_;
-  int status_divider_;
-  std::string canIface_;
+  int heartbeat_divider_ = 5;
+  int status_divider_ = 10;
+  std::string canIface_ = "can0";
 
   rclcpp::Clock clock_;
-  
-  hardware_interface::HardwareInfo info_;
+
   std::unique_ptr<NeoLinearJoint> linear_joint_;
   motor_t motor;
 

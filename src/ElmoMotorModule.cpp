@@ -27,10 +27,10 @@ SOFTWARE.
 
 using std::placeholders::_1;
 
-ElmoMotorModule::ElmoMotorModule(motor_t & motor)
+ElmoMotorModule::ElmoMotorModule(motor_t motor, rclcpp::Logger logger)
+  :motor_(motor), logger_(logger)
 {
   // configuring CAN for the motor transmission
-  motor_ = motor;
   motor_.can_Tx_PDO1 = motor_.node_id + 0x180;
   motor_.can_Tx_PDO2 = motor_.node_id + 0x280;
   motor_.can_Rx_PDO2 = motor_.node_id + 0x300;
@@ -126,6 +126,7 @@ void ElmoMotorModule::transmitCan(const can_msg_t & msg)
     const auto res = ::write(canSock_, &out, sizeof(out));
     if (res < 0) {
       throw std::runtime_error("write() failed with: " + std::string(strerror(errno)));
+      
     }
     if (res != sizeof(out)) {
       // re-open socket
@@ -372,7 +373,7 @@ bool ElmoMotorModule::isHomed()
 
   // Check for timeout
   if ((now - motor_.homing_start_time).seconds() > 20) {
-    std::cout<<"Homing timeout"<<std::endl; // later ROS log
+    RCLCPP_ERROR(logger_, "Homing timeout");
     armHoming();
   }
 
@@ -510,6 +511,7 @@ void ElmoMotorModule::openSocket()
       canSock_ = ::socket(PF_CAN, SOCK_RAW, CAN_RAW);
       if (canSock_ < 0) {
         throw std::runtime_error("socket() failed!");
+        RCLCPP_ERROR(logger_, "Socket() failed!");
       }
       ::ifreq ifr = {};
       ::strncpy(ifr.ifr_name, canIface_.c_str(), IFNAMSIZ);
@@ -527,20 +529,25 @@ void ElmoMotorModule::openSocket()
         throw std::runtime_error("bind() failed!");
       }
 
-      // RCLCPP_INFO_STREAM(
-      //   this->get_logger(), "CAN interface '" << canIface_ << "' opened successfully.");
+      RCLCPP_INFO_STREAM(
+        logger_, "CAN interface '" << canIface_ << "' opened successfully.");
       sockStatus_ = true;
       isError_ = false;
     } catch (const std::exception & ex) {
-      // RCLCPP_WARN_STREAM(
-      //   this->get_logger(), "Failed to open CAN interface '" << canIface << "': "
-      //                                                        << ex.what() << " (" <<
-      //     ::strerror(errno) << ")");
+      RCLCPP_WARN_STREAM(
+        logger_, "Failed to open CAN interface '" << canIface_ << "': "
+                                                             << ex.what() << " (" <<
+          ::strerror(errno) << ")");
       isError_ = true;
       return;
     }
     can_condtion_.notify_all();  // notify that socket is ready
   }
+}
+
+void ElmoMotorModule::checkSocketError(bool & isError)
+{
+  isError = isError_;
 }
 
 void ElmoMotorModule::readMotor()
@@ -557,8 +564,9 @@ void ElmoMotorModule::readMotor()
   // read a frame
   ::can_frame frame = {};
   const auto res = ::read(canSock_, &frame, sizeof(frame));
+
   if (res != sizeof(frame)) {
-    // RCLCPP_WARN_STREAM(this->get_logger(), "read() failed with " << ::strerror(errno));
+    RCLCPP_WARN_STREAM(logger_, "read() failed with " << ::strerror(errno));
     return;
   }
 
@@ -577,7 +585,7 @@ void ElmoMotorModule::readMotor()
     try {
       handle(msg);
     } catch (const std::exception & ex) {
-      // RCLCPP_WARN_STREAM(this->get_logger(), ex.what());
+      RCLCPP_WARN_STREAM(logger_, ex.what());
     }
     waitForCanSock_ = true;     // enable waiting again
   }
@@ -595,8 +603,6 @@ void ElmoMotorModule::readMotor()
 
 void ElmoMotorModule::handle(const can_msg_t & msg)
 {
-  size_t num_motor_updates = 0;
-
   if (msg.id == motor_.can_Tx_PDO1) {
     handlePDO1(msg); 
   }
@@ -607,12 +613,12 @@ void ElmoMotorModule::handle(const can_msg_t & msg)
   if (motor_.update_recv_time > last_sync_time_) {
     curr_pos_ = currPose();
     curr_vel_ = currVel();
-    num_motor_updates++;
-  } else {
-    curr_pos_ = -1.0;
-    curr_vel_ = -1.0;
-    // Log timeout
-  }
+  } 
+
+  // If needed we can add a debug message later
+  // else {
+  //   RCLCPP_WARN_STREAM(logger_);
+  // }
 
 }
 

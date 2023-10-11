@@ -38,19 +38,19 @@ enum motor_state_e
 struct motor_t
 {
   std::string joint_name;         // ROS joint name
-  int32_t node_id = -1;          // motor "CAN ID"
+  int32_t node_id = 2;          // motor "CAN ID"
   int32_t rot_sign = 0;         // motor rotation direction
-  int32_t enc_ticks_per_rev = 0;      // encoder ticks per motor revolution
+  int32_t enc_ticks_per_rev = 10000;      // encoder ticks per motor revolution
   int32_t enc_home_offset = 0;      // encoder offset for true home position
-  int32_t max_vel_enc_s = 500000;     // max motor velocity in ticks/s (positive)
-  int32_t max_accel_enc_s = 1000000;    // max motor acceleration in ticks/s^2 (positive)
+  int32_t max_vel_enc_s = 200000;     // max motor velocity in ticks/s (positive)
+  int32_t max_accel_enc_s = 500000;    // max motor acceleration in ticks/s^2 (positive)
   int32_t meters_per_revolution = 10;
   int32_t can_Tx_PDO1 = -1;
   int32_t can_Tx_PDO2 = -1;
   int32_t can_Rx_PDO2 = -1;
   int32_t can_Tx_SDO = -1;
   int32_t can_Rx_SDO = -1;
-  int32_t gear_ratio = 0;         // gear ratio
+  int32_t gear_ratio = 3;         // gear ratio
   double torque_constant = 0;       // conversion factor from current to torque
 
   motor_state_e state = ST_PRE_INITIALIZED;

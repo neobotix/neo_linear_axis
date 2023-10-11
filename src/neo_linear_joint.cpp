@@ -23,16 +23,15 @@ SOFTWARE.
  *********************************************************************/
 
 #include <cstdio>
-#include "rclcpp/rclcpp.hpp"
 #include <trajectory_msgs/msg/joint_trajectory.hpp>
 #include <neo_linear_axis/neo_linear_joint.hpp>
 
 using std::placeholders::_1;
 
-NeoLinearJoint::NeoLinearJoint(motor_t motor)
+NeoLinearJoint::NeoLinearJoint(motor_t motor, rclcpp::Logger Logger)
+  :motor_(motor), logger_(Logger)
 {
-  motor_ = motor;
-  motorOp_ = std::make_shared<ElmoMotorModule>(motor_);
+  motorOp_ = std::make_shared<ElmoMotorModule>(motor_, Logger);
 }
 
 NeoLinearJoint::~NeoLinearJoint()
@@ -40,6 +39,7 @@ NeoLinearJoint::~NeoLinearJoint()
 
 void NeoLinearJoint::initComms()
 {
+  RCLCPP_INFO(logger_, "Initializing communication");
   motorOp_->initializeNmt();
 }
 
@@ -107,6 +107,11 @@ void NeoLinearJoint::openSocket()
   motorOp_->openSocket();
 }
 
+void NeoLinearJoint::checkSocketError(bool & isError)
+{
+  motorOp_->checkSocketError(isError);
+}
+
 void NeoLinearJoint::readMotor()
 {
   motorOp_->readMotor();
@@ -138,7 +143,7 @@ void NeoLinearJoint::updateMotor()
   if (motor_.state != ST_MOTOR_FAILURE) {
     motorOp_->checkMotorTimeout(motor_timeout_);
     if (motor_.state == ST_MOTOR_FAILURE) {
-      std::cout<<"motor timeout"<<std::endl;
+      RCLCPP_ERROR(logger_, "motor timeout");
     }
   }
 
@@ -146,7 +151,7 @@ void NeoLinearJoint::updateMotor()
 
   if (motorOp_->isReset()
     && motorOp_->isOperational()) {
-    std::cout<<"Linear joint is operational"<<std::endl;
+    RCLCPP_INFO(logger_, "Linear joint is operational");
   }
 
   // Start homing if not homed
@@ -160,9 +165,9 @@ void NeoLinearJoint::updateMotor()
 
   if (!motorOp_->isHoming()) {
     if (motorOp_->isOperational()) {
-      std::cout<<"Homing interrupted"<<std::endl;
+      RCLCPP_WARN(logger_, "Homing interrupted");
     } else if (motorOp_->isHomed()) {
-      std::cout<<"Homing Finished"<<std::endl;
+      RCLCPP_INFO(logger_, "Homing finished");
       motorOp_->finishHoming();
       motorOp_->motorOff();
     }
@@ -184,15 +189,15 @@ void NeoLinearJoint::updateMotor()
     // Setting position and converting it to velocity commands
     futurePose = currPose_ + currVel_ * lookahead_time_;
     poseDiff = targetPose_ - futurePose;
-    linearVel = poseDiff * steerGain_;
+    linearVel = poseDiff * pGain_;
   }
 
-  if (abs(linearVel) > 0.000 || currPose_ != lastPose_) {
+  if (abs(linearVel) > 0.000 || currPose_ != targetPose_) {
     // Turning on the motor disengages the brake
     if (!motorOp_->isOperational()) {
       motorOp_->motorOn();
     } else {
-      std::cout<<"Motor is already switched on"<<std::endl;
+      RCLCPP_INFO(logger_, "Motor is already switched on");
     }
 
     // Set ctrlVel
@@ -206,7 +211,7 @@ void NeoLinearJoint::updateMotor()
     if(last_update_time_ < last_sync_time_) {
       if (motorOp_->isHomed()) {
         // warn
-        // RCLCPP_WARN(this->get_logger(), "Sync update timeout");
+        RCLCPP_WARN(logger_, "Sync update timeout");
       }
     }
 
@@ -214,6 +219,7 @@ void NeoLinearJoint::updateMotor()
     motorOp_->sendHeartBeat();
 
     last_sync_time_ = rclcpp::Clock().now();
+    motorOp_->setSyncTime(last_sync_time_);
 
     // Status request checker
     if (syncCounter_ % statusdivider_ == 0) {
@@ -225,7 +231,6 @@ void NeoLinearJoint::updateMotor()
     }
     // Heartbeat checker
 
-    lastPose_ = currPose_;
   } else {
     if (motorOp_->isOperational()) {
       motorOp_->motorOff();  

@@ -37,7 +37,7 @@ SOFTWARE.
 class ElmoMotorModule
 {
 public:
-  ElmoMotorModule(motor_t & motor);
+  ElmoMotorModule(motor_t motor, rclcpp::Logger logger);
   ~ElmoMotorModule();
 
   void initializeNmt();
@@ -77,6 +77,7 @@ public:
   double getPose();
   double getVel();
   void setSyncTime(rclcpp::Time last_sync_time);
+  void checkSocketError(bool & isError);
 
 private:
   void canopen_set_int(char cmd_char_1, char cmd_char_2, int32_t index, int32_t data);
@@ -123,5 +124,7 @@ private:
   bool isError_ = false;
   std::string canIface_;
   bool shutdown_=false;
+
+  rclcpp::Logger logger_;
 };
 #endif // NEO_LINEAR_AXIS__ELMO_MOTOR_MODULE_HPP_
