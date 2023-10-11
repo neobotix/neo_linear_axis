@@ -486,7 +486,7 @@ void ElmoMotorModule::canOpenQuery(
 {
   can_msg_t msg;
   msg.id = motor_.can_Rx_PDO2;
-  msg.length = 8;
+  msg.length = 4;
   msg.data[0] = cmd_char_1;
   msg.data[1] = cmd_char_2;
   msg.data[2] = index;

@@ -103,7 +103,7 @@ private:
   std::mutex node_mutex_;
   std::mutex can_mutex_;
   rclcpp::Clock clock_;
-  bool isMotorReset_ = true;
+  bool isMotorReset_ = false;
   bool isHomed_ = false;
   bool isHoming_ = false;
   bool isStopped_ = true;
