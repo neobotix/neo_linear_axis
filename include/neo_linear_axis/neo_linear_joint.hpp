@@ -65,8 +65,11 @@ public:
   void readMotor();
   void shutdown();
   void getJointPos(double & joint_position);
+  void getJointVel(double & joint_velocity);
   void setJointPos(double & joint_position);
   void checkSocketError(bool & isError);
+
+  bool inSafetyRegion();
 
   // void sdoDownload(
   //   int & node_id, int32_t obj_index, int32_t obj_sub_index,
@@ -85,13 +88,21 @@ private:
   double homeVel_;
   double currPose_ = 0.0;
   double currVel_ = 0.0;
+  
   double lookahead_time_ = 0.0; // hardcoding the values
   double targetPose_ = 0.0;
-  double pGain_ = 0.0; // hardcoding the values
+  const double pGain_ = 10.0;
+  const double homingGain_ = 0.15;
+
   int syncCounter_;
   int heartbeatdivider_;
   int statusdivider_;
   rclcpp::Logger logger_;
+  bool safety_shift_ = false;
+  bool motor_ready_ = false;
+  double last_command_ = 0.0;
+  int iter = 0;
+  bool goal_reached_ = false;
 };
 
 #endif // NEO_LINEAR_AXIS__NEO_LINEAR_JOINT_HPP_

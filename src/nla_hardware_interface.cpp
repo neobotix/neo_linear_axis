@@ -29,6 +29,13 @@ SOFTWARE.
 
 namespace nla {
 
+NlaHardwareInterface::NlaHardwareInterface(){}
+
+NlaHardwareInterface::~NlaHardwareInterface(){
+    RCLCPP_INFO(logger_, "Shutting down");
+  linear_joint_->shutdown();
+}
+
 CallbackReturn NlaHardwareInterface::on_init(const hardware_interface::HardwareInfo & info)
 {
   if (hardware_interface::SystemInterface::on_init(info) != hardware_interface::CallbackReturn::SUCCESS) {
@@ -62,6 +69,7 @@ CallbackReturn NlaHardwareInterface::on_init(const hardware_interface::HardwareI
   if (info_.hardware_parameters.count("homeDigIn") > 0) {
     homeDigIn_ = std::stoi(info_.hardware_parameters.at("homeDigIn"));
   } else {
+    homeDigIn_ = 7;
     RCLCPP_WARN(logger_, "Digital input not specified in the URDF.");
   }
 
@@ -95,16 +103,19 @@ CallbackReturn NlaHardwareInterface::on_configure(const rclcpp_lifecycle::State 
   return CallbackReturn::SUCCESS; 
 }
 
-CallbackReturn NlaHardwareInterface::on_activate(const rclcpp_lifecycle::State & /*info*/)
+CallbackReturn NlaHardwareInterface::on_activate(const rclcpp_lifecycle::State & )
 {
   // Starting the motors
   RCLCPP_INFO(logger_, "Initializing motors");
   linear_joint_->initMotor();
+  read_thread_ = std::thread(&NlaHardwareInterface::receive_loop, this);
   return CallbackReturn::SUCCESS;
 }
 
 CallbackReturn NlaHardwareInterface::on_deactivate(const rclcpp_lifecycle::State & /*info*/)
 {
+  RCLCPP_INFO(logger_, "Shutting down");
+  linear_joint_->shutdown();
   return CallbackReturn::SUCCESS;
 }
 
@@ -135,17 +146,33 @@ std::vector<hardware_interface::CommandInterface> NlaHardwareInterface::export_c
   return command_interfaces;
 }
 
+void NlaHardwareInterface::receive_loop()
+{
+  while(rclcpp::ok())
+  {
+    linear_joint_->readMotor();
+  }
+}
+
 return_type NlaHardwareInterface::read(const rclcpp::Time &, const rclcpp::Duration &)
 {
-  linear_joint_->readMotor();
+  RCLCPP_INFO_ONCE(logger_, "Reading motors");
+
   linear_joint_->getJointPos(joint_position_);
+
   return return_type::OK;
 }
 
 return_type NlaHardwareInterface::write(const rclcpp::Time &, const rclcpp::Duration &)
 {
-  linear_joint_->setJointPos(joint_position_commands_);
+
+  RCLCPP_INFO_ONCE(logger_, "writing motors");
+  if (linear_joint_->inSafetyRegion()) {
+    linear_joint_->setJointPos(joint_position_commands_);
+  }
+
   linear_joint_->updateMotor();
+
 
   return return_type::OK;
 }

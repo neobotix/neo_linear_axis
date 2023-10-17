@@ -34,8 +34,8 @@ NeoLinearJoint::NeoLinearJoint(motor_t motor, rclcpp::Logger Logger)
   motorOp_ = std::make_shared<ElmoMotorModule>(motor_, Logger);
 }
 
-NeoLinearJoint::~NeoLinearJoint()
-{}
+NeoLinearJoint::~NeoLinearJoint(){
+}
 
 void NeoLinearJoint::initComms()
 {
@@ -56,6 +56,7 @@ void NeoLinearJoint::setCommonMotorParams(
 
 void NeoLinearJoint::initMotor()
 {
+
   motorOp_->motorOff();
   motorOp_->stopMotion();
 
@@ -66,7 +67,7 @@ void NeoLinearJoint::initMotor()
   motorOp_->configurePDOMapping();
   motorOp_->motorOn();
   motorOp_->requestMotorStatus();
-  motorOp_->setDigitalInput();
+  RCLCPP_INFO(logger_, "Initializing done");
 
   /*show error if any in the above initialization step*/
 
@@ -116,12 +117,12 @@ void NeoLinearJoint::checkSocketError(bool & isError)
 
 void NeoLinearJoint::readMotor()
 {
-  motorOp_->readMotor();
+  motorOp_->readMotor();  
 }
 
 void NeoLinearJoint::shutdown()
 {
-  motorOp_->shutdown();
+  motorOp_->motorOff();
 }
 
 // Gives back the linear position of the joint
@@ -135,7 +136,26 @@ void NeoLinearJoint::getJointPos(double & joint_position)
 // sets the linear position of the joint
 void NeoLinearJoint::setJointPos(double & joint_position)
 {
-  targetPose_ = joint_position ;
+  targetPose_ = joint_position;
+  if (targetPose_ > 0.1) {
+    if(!motorOp_->isOperational() && !goal_reached_) {
+      motorOp_->motorOn();
+      iter = 0;
+    }
+    if(goal_reached_){
+      if (abs(targetPose_ - currPose_) > 0.0005){
+        goal_reached_ = false;
+      }
+    }
+  }
+}
+
+bool NeoLinearJoint::inSafetyRegion()
+{
+  if (safety_shift_){
+    return true;
+  }
+  return false;
 }
 
 void NeoLinearJoint::updateMotor()
@@ -154,92 +174,103 @@ void NeoLinearJoint::updateMotor()
   if (motorOp_->isReset()
     && motorOp_->isOperational()) {
     RCLCPP_INFO(logger_, "Linear joint is operational");
+    motor_ready_ = true;
   }
 
   // Start homing if not homed
 
-  if (!motorOp_->isHomed()) /**check if we need a sync counter later**/{
+  if (!motorOp_->isHomed()) {
     motorOp_->setHomeVel(homeVel_);
     motorOp_->startHoming();
   }
-
+    
   // Checking for homing status
 
-  if (!motorOp_->isHoming()) {
-    if (motorOp_->isOperational()) {
+  if (motorOp_->isHoming()) {
+    if (!motorOp_->isOperational()) {
       RCLCPP_WARN(logger_, "Homing interrupted");
-    } else if (motorOp_->isHomed()) {
+    } else if (motorOp_->checkHomingDone()) {
       RCLCPP_INFO(logger_, "Homing finished");
       motorOp_->finishHoming();
-      motorOp_->motorOff();
+    } else {
+      motorOp_->reqHomStatus();
     }
   }
 
   double futurePose = 0.0;
   double poseDiff = 0.0;
   double ctrlVel = 0.0;
-  double linearVel = 0.0;
+  double linearVel = 0.001;
   currVel_ = motorOp_->getVel();
+  double start_pose = 0.11;
+  double min_safety_pose = 0.1;
+  double max_safety_pose = 0.8;
 
-  if (currPose_ >= 2.0 || currPose_ <= 0.0) {
-    // Engage brakes    
+  // Motor ready after homing. then ready to get in position commands
+  if (motor_ready_) {
+  
+    rclcpp::Time current_time = clock_.now();
 
-    // Set Motor Velocity 
-    linearVel = 0.0;
-    motorOp_->motorSetVel(linearVel);
-  } else {
-    // Setting position and converting it to velocity commands
-    futurePose = currPose_ + currVel_ * lookahead_time_;
-    poseDiff = targetPose_ - futurePose;
-    linearVel = poseDiff * pGain_;
-  }
-
-  if (abs(linearVel) > 0.000 || currPose_ != targetPose_) {
-    // Turning on the motor disengages the brake
-    if (!motorOp_->isOperational()) {
-      motorOp_->motorOn();
+    if (!safety_shift_) {
+      futurePose = currPose_ + currVel_ * lookahead_time_;
+      poseDiff = start_pose - futurePose;
+      linearVel = poseDiff * homingGain_;
+      motorOp_->motorSetVel(linearVel);
+      motorOp_->beginMotion();
+      if (abs(currPose_ - start_pose) <= 0.005) {
+        safety_shift_ = true;
+        motorOp_->motorOff();
+        linearVel = 0;
+        motorOp_->motorSetVel(linearVel);
+        RCLCPP_INFO(logger_, "Reached safety region");
+        RCLCPP_INFO(logger_, "Ready to send position commands");
+      }
     } else {
-      RCLCPP_INFO(logger_, "Motor is already switched on");
-    }
-
-    // Set ctrlVel
-    ctrlVel = linearVel;
-
-    motorOp_->motorSetVel(ctrlVel);
-    motorOp_->beginMotion();  
-    syncCounter_++;
-
-    // Check for update timeout
-    if(last_update_time_ < last_sync_time_) {
-      if (motorOp_->isHomed()) {
-        // warn
-        RCLCPP_WARN(logger_, "Sync update timeout");
+      if (currPose_ > max_safety_pose
+        || currPose_ < min_safety_pose) {
+        linearVel = 0;
+        motorOp_->motorSetVel(linearVel);
+        motorOp_->beginMotion();
+      } else {
+        if (motorOp_->isOperational()) {
+          // Converting position commands to velocity commands
+          // Using a simple P controller for compensating the error
+          poseDiff = targetPose_ - currPose_; 
+          // have to divide by del T above, rather compensating using P Gain
+          // ToDo: Divide by del T and update the P Gain
+          linearVel = poseDiff * pGain_;
+          motorOp_->motorSetVel(linearVel);
+          motorOp_->beginMotion();
+          iter++;
+          // Stopping critera: stop the motor based on the progress
+          // Progress tolerance will be changed in the later version
+          if(iter == 50) {
+            if (abs(targetPose_ - last_command_) <= 0.0005){
+              motorOp_->motorOff();
+              goal_reached_ = true;
+            }
+            iter = 0;
+            last_command_ = targetPose_;
+          }
+        }      
       }
     }
 
+    syncCounter_++;
     motorOp_->sendSyncMsg();
-    motorOp_->sendHeartBeat();
+    // motorOp_->sendHeartBeat();
 
     last_sync_time_ = rclcpp::Clock().now();
     motorOp_->setSyncTime(last_sync_time_);
 
-    // Status request checker
+    // // Status request checker
     if (syncCounter_ % statusdivider_ == 0) {
           motorOp_->requestMotorStatus();    // request status update
     }
 
-    if (syncCounter_ % heartbeatdivider_ == 0) {
+    if ((syncCounter_ + 1) % heartbeatdivider_ == 0) {
       motorOp_->sendHeartBeat(); // Heartbeat of master to slave
+      motorOp_->readIOs();
     }
-    // Heartbeat checker
-
-  } else {
-    if (motorOp_->isOperational()) {
-      motorOp_->motorOff();  
-    } else {
-      std::cout<<"Motor is already switched off"<<std::endl;
-    }
-    
-  }
-  
+  }  
 }

@@ -73,12 +73,15 @@ public:
   void openSocket();
   void setCanIface(std::string & canIface);
   void readMotor();
+  void reqHomStatus();
   void shutdown();
   double getPose();
   double getVel();
   void setSyncTime(rclcpp::Time last_sync_time);
   void checkSocketError(bool & isError);
   void setDigitalInput();
+  bool checkHomingDone();
+  void readIOs();
 
 private:
   void canopen_set_int(char cmd_char_1, char cmd_char_2, int32_t index, int32_t data);
@@ -119,6 +122,7 @@ private:
   double homeVel_;
   double curr_pos_ = 0.0;
   double curr_vel_ = 0.0;
+  double last_command_ = 0.0;
   int heartbeat_divider_;
   double control_rate_;
 
@@ -127,5 +131,6 @@ private:
   bool shutdown_=false;
 
   rclcpp::Logger logger_;
+  rclcpp::Time last_update_time_;
 };
 #endif // NEO_LINEAR_AXIS__ELMO_MOTOR_MODULE_HPP_

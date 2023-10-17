@@ -36,6 +36,7 @@ ElmoMotorModule::ElmoMotorModule(motor_t motor, rclcpp::Logger logger)
   motor_.can_Rx_PDO2 = motor_.node_id + 0x300;
   motor_.can_Tx_SDO = motor_.node_id + 0x580;
   motor_.can_Rx_SDO = motor_.node_id + 0x600;
+  last_update_time_ = clock_.now();
 }
 
 void ElmoMotorModule::initializeNmt()
@@ -146,7 +147,7 @@ void ElmoMotorModule::shutdown()
     shutdown_ = true;
   }
   {
-    std::unique_lock<std::mutex> lock(can_mutex_);
+    // std::lock_guard<std::mutex> lock(m_can_mutex);
     if (canSock_ >= 0) {
       ::close(canSock_);
       canSock_ = -1;
@@ -210,7 +211,7 @@ void ElmoMotorModule::stopMotion()
 
 void ElmoMotorModule::startHoming()
 {
-  if (isHoming_ && !isOperational() && !isStopped()) {
+  if (isHoming_ ) {
     return;
   }
   stopMotion();
@@ -221,7 +222,7 @@ void ElmoMotorModule::startHoming()
 
   // configure homing sequences
   // setting the value such that increment counter resets after the homing event occurs
-  canopen_set_int('H', 'M', 2, motor_.enc_home_offset);
+  canopen_set_int('H', 'M', 2, -motor_.enc_home_offset);
   canSync();
 
   /** choosing channel/switch on which controller has to 
@@ -258,13 +259,14 @@ void ElmoMotorModule::armHoming()
 {
   motor_.homing_state = -1;    // reset state
   motor_.homing_start_time = clock_.now();
+  RCLCPP_INFO(logger_, "arming");
 
   canopen_set_int('H', 'M', 1, 1);   // arm homeing
 }
 
 void ElmoMotorModule::motorSetVel(double & linVelms)
 {
-  const double motor_vel_rev_s = motor_.gear_ratio * linVelms;
+  const double motor_vel_rev_s = motor_.gear_ratio * linVelms / motor_.meters_per_revolution;
   const int32_t motor_vel_inc_s = static_cast<int>(motor_vel_rev_s * motor_.enc_ticks_per_rev);
 
   const int32_t lim_motor_vel_inc_s = std::min(
@@ -351,19 +353,26 @@ void ElmoMotorModule::finishHoming()
 
 bool ElmoMotorModule::isHoming()
 {
-  if (isHoming_) {
-    canOpenQuery('H', 'M', 1);  
-  }
   return isHoming_;
+}
+
+void ElmoMotorModule::reqHomStatus()
+{
+  canOpenQuery('H', 'M', 1);
 }
 
 bool ElmoMotorModule::isHomed()
 {
+  return isHomed_;
+}
+
+bool ElmoMotorModule::checkHomingDone()
+{
   const rclcpp::Time now = clock_.now();
 
-  // Check to stop motor
   if (motor_.homing_state == 1) {
     stopMotion();
+    motor_.homing_state = 2;
   }
 
   // Check for restart
@@ -380,6 +389,7 @@ bool ElmoMotorModule::isHomed()
   if (motor_.homing_state != 2) {
     isHomed_ = false;
   } else {
+    RCLCPP_INFO(logger_, "Homing Finishing");
     isHomed_ = true;
   }
 
@@ -431,7 +441,7 @@ void ElmoMotorModule::motorOff()
 
 void ElmoMotorModule::setDigitalInput()
 {
-  canopen_set_int('I', 'L', 1, 7);
+  canopen_set_int('I', 'L', 11, 7);
 }
 
 void ElmoMotorModule::requestMotorStatus()
@@ -555,11 +565,17 @@ void ElmoMotorModule::checkSocketError(bool & isError)
   isError = isError_;
 }
 
+void ElmoMotorModule::readIOs()
+{
+  canOpenQuery('I', 'B', 10);
+  canOpenQuery('I', 'B', 11);
+}
+
 void ElmoMotorModule::readMotor()
 {
+  
   // close socket if error
   if (isError_) {
-    std::unique_lock<std::mutex> lock(can_mutex_);
     ::close(canSock_);
     sockStatus_ = false;
     ::usleep(1000 * 1000);  // in case of error sleep some time
@@ -583,10 +599,10 @@ void ElmoMotorModule::readMotor()
   for (int i = 0; i < frame.can_dlc; ++i) {
     msg.data[i] = frame.data[i];
   }
-
   // process it
   {
     waitForCanSock_ = false;    // disable waiting for transmit (avoid dead-lock)
+    std::lock_guard<std::mutex> lock(node_mutex_);
     try {
       handle(msg);
     } catch (const std::exception & ex) {
@@ -596,35 +612,33 @@ void ElmoMotorModule::readMotor()
   }
 
   // close socket
-  {
-    // std::lock_guard<std::mutex> lock(m_can_mutex);
-    if (canSock_ >= 0) {
-      ::close(canSock_);
-      canSock_ = -1;
-    }
-    can_condtion_.notify_all();     // notify that socket is closed
-  }
+  // {
+  //   // std::lock_guard<std::mutex> lock(m_can_mutex);
+  //   if (canSock_ >= 0) {
+  //     ::close(canSock_);
+  //     canSock_ = -1;
+  //   }
+  //   can_condtion_.notify_all();     // notify that socket is closed
+  // }
 }
 
 void ElmoMotorModule::handle(const can_msg_t & msg)
 {
   if (msg.id == motor_.can_Tx_PDO1) {
-    handlePDO1(msg); 
+    handlePDO1(msg);
   }
   if (msg.id == motor_.can_Tx_PDO2) {
     handlePDO2(msg);
   }
 
-  if (motor_.update_recv_time > last_sync_time_) {
-    curr_pos_ = currPose();
+  if ( (motor_.update_recv_time > last_sync_time_) ) {
     curr_vel_ = currVel();
-  } 
-
-  // If needed we can add a debug message later
-  // else {
-  //   RCLCPP_WARN_STREAM(logger_);
-  // }
-
+    auto pose = curr_vel_ *(clock_.now() - last_update_time_).seconds();
+    last_update_time_ = clock_.now();
+    curr_pos_ += pose;
+    motor_.prev_enc_pos_inc = motor_.curr_enc_pos_inc;
+  }
+  
 }
 
 void ElmoMotorModule::setSyncTime(rclcpp::Time last_sync_time)
@@ -664,6 +678,7 @@ void ElmoMotorModule::handlePDO2(const can_msg_t & msg)
   }
   if (msg.data[0] == 'H' && msg.data[1] == 'M') {
     if (msg.data[4] == 0) {      // check if motor says homing finished
+
       if (motor_.homing_state == 0) {
         if (((clock_.now() - motor_.homing_start_time).nanoseconds() * 1.0 /
           1000000000.0) > 0.5)
@@ -679,17 +694,23 @@ void ElmoMotorModule::handlePDO2(const can_msg_t & msg)
       motor_.homing_state = 0;       // homing active
     }
   }
-  if (msg.data[0] == 'I' && msg.data[1] == 'Q') {
-    motor_.curr_torque = read_float(msg, 4) * motor_.torque_constant;
-  }
-  if (msg.data[0] == 'I' && msg.data[1] == 'P') {
-    RCLCPP_INFO(logger_, "Got digital input info");
+  if (msg.data[0] == 'I' && msg.data[1] == 'B') {
+    auto data = read_int32(msg, 4);
+    if (msg.data[2] == 10) {
+      // Save it to the variable
+    } else if (msg.data[2] == 11) {
+      // Save it again
+    }
   }
 }
 
 double ElmoMotorModule::currPose()
 {
-  return static_cast<double>(motor_.meters_per_revolution * motor_.curr_enc_pos_inc) /
+  if (motor_.curr_enc_pos_inc < 0) {
+    motor_.curr_enc_pos_inc = 30000 - abs(motor_.curr_enc_pos_inc);
+  }
+
+  return static_cast<double>(motor_.meters_per_revolution * std::abs(motor_.curr_enc_pos_inc - motor_.prev_enc_pos_inc)) /
          motor_.enc_ticks_per_rev / motor_.gear_ratio;
 }
 
@@ -724,21 +745,21 @@ void ElmoMotorModule::evalStatus(int32_t prev_status)
   if (motor_.curr_status & 1) {
     if (motor_.curr_status != prev_status) {
       if ((motor_.curr_status & 0xE) == 2) {
-        // RCLCPP_ERROR_STREAM(
-        //   this->get_logger(), motor_.joint_name << ": drive error under voltage");
+        RCLCPP_ERROR_STREAM(
+          logger_, motor_.joint_name << ": drive error under voltage");
       } else if ((motor_.curr_status & 0xE) == 4) {
-        // RCLCPP_ERROR_STREAM(
-        //   this->get_logger(), motor_.joint_name << ": drive error over voltage");
+        RCLCPP_ERROR_STREAM(
+          logger_, motor_.joint_name << ": drive error over voltage");
       } else if ((motor_.curr_status & 0xE) == 10) {
-        // RCLCPP_ERROR_STREAM(
-        //   this->get_logger(), motor_.joint_name << ": drive error short circuit");
+        RCLCPP_ERROR_STREAM(
+          logger_, motor_.joint_name << ": drive error short circuit");
       } else if ((motor_.curr_status & 0xE) == 12) {
-        // RCLCPP_ERROR_STREAM(
-        //   this->get_logger(), motor_.joint_name << ": drive error over-heating");
+        RCLCPP_ERROR_STREAM(
+          logger_, motor_.joint_name << ": drive error over-heating");
       } else {
-        // RCLCPP_ERROR_STREAM(
-        //   this->get_logger(),
-        //   motor_.joint_name << ": unknown failure: " << (motor_.curr_status & 0xE));
+        RCLCPP_ERROR_STREAM(
+          logger_,
+          motor_.joint_name << ": unknown failure: " << (motor_.curr_status & 0xE));
       }
     }
 
@@ -749,7 +770,7 @@ void ElmoMotorModule::evalStatus(int32_t prev_status)
   } else if (motor_.curr_status & (1 << 6)) {
     // general failure
     if (motor_.curr_status != prev_status) {
-      // RCLCPP_ERROR_STREAM(this->get_logger(), motor_.joint_name << ": failure latched");
+      RCLCPP_ERROR_STREAM(logger_, motor_.joint_name << ": failure latched");
     }
 
     // request detailed description of failure
@@ -760,12 +781,12 @@ void ElmoMotorModule::evalStatus(int32_t prev_status)
     // check if Bit 4 (-> Motor is ON) ist set
     if (motor_.curr_status & (1 << 4)) {
       if (motor_.state != ST_OPERATION_ENABLED) {
-        // RCLCPP_INFO_STREAM(this->get_logger(), motor_.joint_name << ": operation enabled");
+        RCLCPP_INFO_STREAM(logger_, motor_.joint_name << ": operation enabled");
       }
       motor_.state = ST_OPERATION_ENABLED;
     } else {
       if (motor_.state != ST_OPERATION_DISABLED) {
-        // RCLCPP_WARN_STREAM(this->get_logger(), motor_.joint_name << ": operation disabled");
+        RCLCPP_WARN_STREAM(logger_, motor_.joint_name << ": operation disabled");
       }
       motor_.state = ST_OPERATION_DISABLED;
     }
@@ -776,27 +797,27 @@ void ElmoMotorModule::evaluateFailure(int32_t prev_status)
 {
   if (motor_.curr_motor_failure != prev_status) {
     if (motor_.curr_motor_failure & (1 << 2)) {
-      // RCLCPP_ERROR_STREAM(
-      //   this->get_logger(),
-      //   motor_.joint_name << ": motor failure: feedback loss");
+      RCLCPP_ERROR_STREAM(
+        logger_,
+        motor_.joint_name << ": motor failure: feedback loss");
     } else if (motor_.curr_motor_failure & (1 << 3)) {
-      // RCLCPP_ERROR_STREAM(
-      //   this->get_logger(), motor_.joint_name << ": motor failure: peak current exceeded");
+      RCLCPP_ERROR_STREAM(
+        logger_, motor_.joint_name << ": motor failure: peak current exceeded");
     } else if (motor_.curr_motor_failure & (1 << 7)) {
-      // RCLCPP_ERROR_STREAM(
-      //   this->get_logger(), motor_.joint_name << ": motor failure: speed track error");
+      RCLCPP_ERROR_STREAM(
+        logger_, motor_.joint_name << ": motor failure: speed track error");
     } else if (motor_.curr_motor_failure & (1 << 8)) {
-      // RCLCPP_ERROR_STREAM(
-      //   this->get_logger(), motor_.joint_name << ": motor failure: position track error");
+      RCLCPP_ERROR_STREAM(
+        logger_, motor_.joint_name << ": motor failure: position track error");
     } else if (motor_.curr_motor_failure & (1 << 17)) {
-      // RCLCPP_ERROR_STREAM(
-      //   this->get_logger(), motor_.joint_name << ": motor failure: speed limit exceeded");
+      RCLCPP_ERROR_STREAM(
+        logger_, motor_.joint_name << ": motor failure: speed limit exceeded");
     } else if (motor_.curr_motor_failure & (1 << 21)) {
-      // RCLCPP_ERROR_STREAM(
-      //   this->get_logger(), motor_.joint_name << ": motor failure: motor stuck");
+      RCLCPP_ERROR_STREAM(
+        logger_, motor_.joint_name << ": motor failure: motor stuck");
     } else {
-      // RCLCPP_ERROR_STREAM(
-      //   this->get_logger(), motor_.joint_name << ": motor failure: " << motor_.curr_motor_failure);
+      RCLCPP_ERROR_STREAM(
+        logger_, motor_.joint_name << ": motor failure: " << motor_.curr_motor_failure);
     }
   }
 }
