@@ -68,8 +68,8 @@ public:
   void getJointVel(double & joint_velocity);
   void setJointPos(double & joint_position);
   void checkSocketError(bool & isError);
-
   bool inSafetyRegion();
+  void getGpioData(int32_t & dig_1, int32_t & dig_2);
 
   // void sdoDownload(
   //   int & node_id, int32_t obj_index, int32_t obj_sub_index,

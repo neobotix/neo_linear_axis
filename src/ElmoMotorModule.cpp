@@ -656,6 +656,12 @@ double ElmoMotorModule::getVel()
   return curr_vel_;
 }
 
+void ElmoMotorModule::digInStates(int32_t & dig_1, int32_t & dig_2)
+{
+  dig_1 = dig_ins_[0];
+  dig_2 = dig_ins_[1];
+}
+
 void ElmoMotorModule::handlePDO1(const can_msg_t & msg)
 {
   motor_.curr_enc_pos_inc = read_int32(msg, 0);
@@ -697,9 +703,9 @@ void ElmoMotorModule::handlePDO2(const can_msg_t & msg)
   if (msg.data[0] == 'I' && msg.data[1] == 'B') {
     auto data = read_int32(msg, 4);
     if (msg.data[2] == 10) {
-      // Save it to the variable
+      dig_ins_[0] = data; 
     } else if (msg.data[2] == 11) {
-      // Save it again
+      dig_ins_[1] = data;
     }
   }
 }

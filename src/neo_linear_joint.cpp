@@ -120,6 +120,13 @@ void NeoLinearJoint::readMotor()
   motorOp_->readMotor();  
 }
 
+void NeoLinearJoint::getGpioData(
+  int32_t & dig_1,
+  int32_t & dig_2)
+{
+  motorOp_->digInStates(dig_1, dig_2);
+}
+
 void NeoLinearJoint::shutdown()
 {
   motorOp_->motorOff();
@@ -199,7 +206,6 @@ void NeoLinearJoint::updateMotor()
 
   double futurePose = 0.0;
   double poseDiff = 0.0;
-  double ctrlVel = 0.0;
   double linearVel = 0.001;
   currVel_ = motorOp_->getVel();
   double start_pose = 0.11;

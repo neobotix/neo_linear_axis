@@ -82,6 +82,7 @@ public:
   void setDigitalInput();
   bool checkHomingDone();
   void readIOs();
+  void digInStates(int32_t & dig_1, int32_t & dig_2);
 
 private:
   void canopen_set_int(char cmd_char_1, char cmd_char_2, int32_t index, int32_t data);
@@ -99,7 +100,6 @@ private:
   float read_float(const can_msg_t & msg, int offset) const;
   double currPose();
   double currVel();
-
 
   motor_t motor_;
   bool waitForCanSock_ = false;
@@ -125,6 +125,7 @@ private:
   double last_command_ = 0.0;
   int heartbeat_divider_;
   double control_rate_;
+  int32_t dig_ins_[2];
 
   bool isError_ = false;
   std::string canIface_;

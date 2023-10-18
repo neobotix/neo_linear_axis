@@ -49,6 +49,7 @@ private:
   rclcpp::Clock clock_;
 
   std::unique_ptr<NeoLinearJoint> linear_joint_;
+  std::vector<double> gpio_states_;
   motor_t motor;
 
 // Check for other functions that needs to be included and overrided. 
