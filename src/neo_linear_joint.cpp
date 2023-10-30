@@ -67,6 +67,7 @@ void NeoLinearJoint::initMotor()
   motorOp_->configurePDOMapping();
   motorOp_->motorOn();
   motorOp_->requestMotorStatus();
+  motorOp_->readIOs();
   RCLCPP_INFO(logger_, "Initializing done");
 
   /*show error if any in the above initialization step*/
@@ -120,6 +121,13 @@ void NeoLinearJoint::readMotor()
   motorOp_->readMotor();  
 }
 
+void NeoLinearJoint::getGpioData(
+  int32_t & dig_1,
+  int32_t & dig_2)
+{
+  motorOp_->digInStates(dig_1, dig_2);
+}
+
 void NeoLinearJoint::shutdown()
 {
   motorOp_->motorOff();
@@ -131,6 +139,11 @@ void NeoLinearJoint::getJointPos(double & joint_position)
   currPose_ = motorOp_->getPose();
   last_update_time_ = rclcpp::Clock().now();
   joint_position = currPose_;
+}
+
+void NeoLinearJoint::getJointVel(double & joint_velocity)
+{
+  joint_velocity = motorOp_->currVel();
 }
 
 // sets the linear position of the joint
@@ -175,6 +188,7 @@ void NeoLinearJoint::updateMotor()
     && motorOp_->isOperational()) {
     RCLCPP_INFO(logger_, "Linear joint is operational");
     motor_ready_ = true;
+    motorOp_->motorOff();
   }
 
   // Start homing if not homed
@@ -199,21 +213,23 @@ void NeoLinearJoint::updateMotor()
 
   double futurePose = 0.0;
   double poseDiff = 0.0;
-  double ctrlVel = 0.0;
   double linearVel = 0.001;
   currVel_ = motorOp_->getVel();
   double start_pose = 0.11;
   double min_safety_pose = 0.1;
   double max_safety_pose = 0.8;
+  double p_ctrl = 0.0;
+  double i_ctrl = 0.0;
 
   // Motor ready after homing. then ready to get in position commands
   if (motor_ready_) {
-  
-    rclcpp::Time current_time = clock_.now();
-
     if (!safety_shift_) {
+      if (!motorOp_->isOperational()){
+        motorOp_->motorOn();
+      }
       futurePose = currPose_ + currVel_ * lookahead_time_;
       poseDiff = start_pose - futurePose;
+
       linearVel = poseDiff * homingGain_;
       motorOp_->motorSetVel(linearVel);
       motorOp_->beginMotion();
@@ -224,6 +240,7 @@ void NeoLinearJoint::updateMotor()
         motorOp_->motorSetVel(linearVel);
         RCLCPP_INFO(logger_, "Reached safety region");
         RCLCPP_INFO(logger_, "Ready to send position commands");
+        motorOp_->enablePosMode();
       }
     } else {
       if (currPose_ > max_safety_pose
@@ -233,14 +250,7 @@ void NeoLinearJoint::updateMotor()
         motorOp_->beginMotion();
       } else {
         if (motorOp_->isOperational()) {
-          // Converting position commands to velocity commands
-          // Using a simple P controller for compensating the error
-          poseDiff = targetPose_ - currPose_; 
-          // have to divide by del T above, rather compensating using P Gain
-          // ToDo: Divide by del T and update the P Gain
-          linearVel = poseDiff * pGain_;
-          motorOp_->motorSetVel(linearVel);
-          motorOp_->beginMotion();
+          motorOp_->motorSetPos(targetPose_);
           iter++;
           // Stopping critera: stop the motor based on the progress
           // Progress tolerance will be changed in the later version

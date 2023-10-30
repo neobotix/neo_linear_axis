@@ -68,8 +68,8 @@ public:
   void getJointVel(double & joint_velocity);
   void setJointPos(double & joint_position);
   void checkSocketError(bool & isError);
-
   bool inSafetyRegion();
+  void getGpioData(int32_t & dig_1, int32_t & dig_2);
 
   // void sdoDownload(
   //   int & node_id, int32_t obj_index, int32_t obj_sub_index,
@@ -82,6 +82,8 @@ private:
 
   rclcpp::Time last_update_time_;
   rclcpp::Time last_sync_time_;
+  rclcpp::Time last_command_time_;
+  rclcpp::Time goal_iter_time_[2];
 
   double motor_timeout_;
   std::shared_ptr<ElmoMotorModule> motorOp_;
@@ -91,8 +93,12 @@ private:
   
   double lookahead_time_ = 0.0; // hardcoding the values
   double targetPose_ = 0.0;
-  const double pGain_ = 10.0;
+  const double pGain_ = 7.0;
   const double homingGain_ = 0.15;
+  const double iGain_ = 85.0;
+  double low_pass_ = 0.5;
+  double last_vel_ = 0.0;
+  double integral_ = 0.0;
 
   int syncCounter_;
   int heartbeatdivider_;
@@ -102,6 +108,7 @@ private:
   bool motor_ready_ = false;
   double last_command_ = 0.0;
   int iter = 0;
+  int goal_iter = 0;
   bool goal_reached_ = false;
 };
 

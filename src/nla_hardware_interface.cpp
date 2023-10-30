@@ -70,7 +70,7 @@ CallbackReturn NlaHardwareInterface::on_init(const hardware_interface::HardwareI
     homeDigIn_ = std::stoi(info_.hardware_parameters.at("homeDigIn"));
   } else {
     homeDigIn_ = 7;
-    RCLCPP_WARN(logger_, "Digital input not specified in the URDF.");
+    RCLCPP_WARN(logger_, "Homing digital input not specified in the URDF.");
   }
 
   // Get all the necessary parameters for the motors
@@ -84,6 +84,9 @@ CallbackReturn NlaHardwareInterface::on_init(const hardware_interface::HardwareI
     heartbeat_divider_,
     status_divider_); // Setting dummy for now
   linear_joint_->setCanIface(canIface_); // Setting dummy for now
+
+  gpio_states_.resize(
+    info_.gpios[0].state_interfaces.size(), std::numeric_limits<double>::quiet_NaN());
 
   return CallbackReturn::SUCCESS;
 }
@@ -122,12 +125,24 @@ CallbackReturn NlaHardwareInterface::on_deactivate(const rclcpp_lifecycle::State
 std::vector<hardware_interface::StateInterface> NlaHardwareInterface::export_state_interfaces()
 {
   std::vector<hardware_interface::StateInterface> state_interfaces;
-  state_interfaces.reserve(1);
+  state_interfaces.reserve(4);
 
   // For now just handling positions, later will integrate the velocity and the torque interface
 
   state_interfaces.emplace_back(hardware_interface::StateInterface(
     info_.joints[0].name, hardware_interface::HW_IF_POSITION, &joint_position_
+    ));
+
+  state_interfaces.emplace_back(hardware_interface::StateInterface(
+    info_.joints[0].name, hardware_interface::HW_IF_VELOCITY, &joint_velocity_
+    ));
+
+  state_interfaces.emplace_back(hardware_interface::StateInterface(
+    info_.gpios[0].name, "dig_in_" + std::to_string(1), &gpio_states_[0]
+    ));
+
+  state_interfaces.emplace_back(hardware_interface::StateInterface(
+    info_.gpios[0].name, "dig_in_" + std::to_string(2), &gpio_states_[1]
     ));
 
   return state_interfaces;
@@ -157,8 +172,14 @@ void NlaHardwareInterface::receive_loop()
 return_type NlaHardwareInterface::read(const rclcpp::Time &, const rclcpp::Duration &)
 {
   RCLCPP_INFO_ONCE(logger_, "Reading motors");
+  int32_t gpio_states[2] = {0, 0};
 
   linear_joint_->getJointPos(joint_position_);
+  linear_joint_->getJointVel(joint_velocity_);
+  linear_joint_->getGpioData(gpio_states[0], gpio_states[1]);
+
+  gpio_states_[0] = static_cast<double>(gpio_states[0]);
+  gpio_states_[1] = static_cast<double>(gpio_states[1]);
 
   return return_type::OK;
 }

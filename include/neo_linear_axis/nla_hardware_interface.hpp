@@ -33,13 +33,13 @@ public:
 
 private:
   double joint_position_commands_ = 0.0;
-  double joint_velocity_commands_ = 0.0;
   double joint_position_ = 0.0;
   double joint_velocity_ = 0.0;
   double timeout_ = 0.2;
-  double homeVel_ = 0.01;
-  int homeDigIn_ = 9;
+  double homeVel_ = -0.03;
+  int homeDigIn_ = 5;
   double control_rate_ = 100.0;
+
   int heartbeat_divider_ = 5;
   int status_divider_ = 10;
   std::string canIface_ = "can0";
@@ -49,6 +49,7 @@ private:
   rclcpp::Clock clock_;
 
   std::unique_ptr<NeoLinearJoint> linear_joint_;
+  std::vector<double> gpio_states_;
   motor_t motor;
 
 // Check for other functions that needs to be included and overrided. 

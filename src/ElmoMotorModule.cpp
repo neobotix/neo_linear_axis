@@ -186,6 +186,29 @@ void ElmoMotorModule::enableVelMode()
   canSync();
 }
 
+void ElmoMotorModule::enablePosMode()
+{
+  // switch Unit Mode
+  canopen_set_int('U', 'M', 0, 5);
+
+  canSync();
+
+  // set Target Radius to X Increments
+  canopen_set_int('U', 'M', 0, motor_.target_radius_enc);
+
+  canSync();
+
+  // set Target Time to X ms
+  canopen_set_int('T', 'R', 2, motor_.target_time_ms);
+
+  canSync();
+
+  // set max position track error (see page 3-50 in elmo simpleiq)
+  canopen_set_int('E', 'R', 3, motor_.max_pos_error_enc);
+
+  canSync();
+}
+
 void ElmoMotorModule::setClock(rclcpp::Clock & clock)
 {
   clock_ = clock;
@@ -212,6 +235,12 @@ void ElmoMotorModule::stopMotion()
 void ElmoMotorModule::startHoming()
 {
   if (isHoming_ ) {
+    return;
+  }
+
+  if (dig_ins_[1] == 1) {
+    RCLCPP_INFO(logger_, "Linear axis already in the home position");
+    finishHoming();
     return;
   }
   stopMotion();
@@ -276,6 +305,14 @@ void ElmoMotorModule::motorSetVel(double & linVelms)
     motor_.max_vel_enc_s);
 
   canopen_set_int('J', 'V', 0, lim_motor_vel_inc_s);
+}
+
+void ElmoMotorModule::motorSetPos(double & jointPos)
+{
+  const double motor_pos_rev = motor_.gear_ratio * jointPos / motor_.meters_per_revolution;
+  const int32_t motor_pos_inc = static_cast<int>(motor_pos_rev * motor_.enc_ticks_per_rev);
+
+  canopen_set_int('P', 'A', 0, motor_pos_inc);
 }
 
 void ElmoMotorModule::setHomeDigIn(int & HomeDigIn)
@@ -656,6 +693,12 @@ double ElmoMotorModule::getVel()
   return curr_vel_;
 }
 
+void ElmoMotorModule::digInStates(int32_t & dig_1, int32_t & dig_2)
+{
+  dig_1 = dig_ins_[0];
+  dig_2 = dig_ins_[1];
+}
+
 void ElmoMotorModule::handlePDO1(const can_msg_t & msg)
 {
   motor_.curr_enc_pos_inc = read_int32(msg, 0);
@@ -697,9 +740,9 @@ void ElmoMotorModule::handlePDO2(const can_msg_t & msg)
   if (msg.data[0] == 'I' && msg.data[1] == 'B') {
     auto data = read_int32(msg, 4);
     if (msg.data[2] == 10) {
-      // Save it to the variable
+      dig_ins_[0] = data; 
     } else if (msg.data[2] == 11) {
-      // Save it again
+      dig_ins_[1] = data;
     }
   }
 }

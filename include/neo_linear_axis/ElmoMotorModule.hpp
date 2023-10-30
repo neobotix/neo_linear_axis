@@ -51,10 +51,12 @@ public:
   void requestMotorStatus();
   void checkMotorTimeout(const double & timeout);
   void motorSetVel(double & linVelms);
+  void motorSetPos(double & jointPos);
   void setClock(rclcpp::Clock & clock);
   bool isReset();
   bool isOperational();
   void enableVelMode();
+  void enablePosMode();
   bool isHomed();
   void setHomeVel(double & homeVel);
   void startHoming();
@@ -82,6 +84,8 @@ public:
   void setDigitalInput();
   bool checkHomingDone();
   void readIOs();
+  void digInStates(int32_t & dig_1, int32_t & dig_2);
+  double currVel();
 
 private:
   void canopen_set_int(char cmd_char_1, char cmd_char_2, int32_t index, int32_t data);
@@ -98,8 +102,6 @@ private:
   int32_t read_int32(const can_msg_t & msg, int offset) const;
   float read_float(const can_msg_t & msg, int offset) const;
   double currPose();
-  double currVel();
-
 
   motor_t motor_;
   bool waitForCanSock_ = false;
@@ -125,6 +127,7 @@ private:
   double last_command_ = 0.0;
   int heartbeat_divider_;
   double control_rate_;
+  int32_t dig_ins_[2];
 
   bool isError_ = false;
   std::string canIface_;

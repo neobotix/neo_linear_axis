@@ -25,6 +25,7 @@ find_package(builtin_interfaces REQUIRED)
 find_package(rclcpp_lifecycle REQUIRED)
 find_package(hardware_interface REQUIRED)
 find_package(pluginlib REQUIRED)
+find_package(control_msgs REQUIRED)
 
 add_library(neo_linear_axis 
   SHARED
@@ -38,6 +39,7 @@ target_compile_features(neo_linear_axis PUBLIC c_std_99 cxx_std_17)  # Require C
 ament_target_dependencies(
   neo_linear_axis
   "geometry_msgs"
+  "control_msgs"
   "std_msgs"
   "rclcpp"
   "trajectory_msgs"
