@@ -194,7 +194,7 @@ void ElmoMotorModule::enablePosMode()
   canSync();
 
   // set Target Radius to X Increments
-  canopen_set_int('U', 'M', 0, motor_.target_radius_enc);
+  canopen_set_int('T', 'R', 1, motor_.target_radius_enc);
 
   canSync();
 
@@ -205,6 +205,8 @@ void ElmoMotorModule::enablePosMode()
 
   // set max position track error (see page 3-50 in elmo simpleiq)
   canopen_set_int('E', 'R', 3, motor_.max_pos_error_enc);
+
+  // ToDo: Need to set the velocity limits?
 
   canSync();
 }
