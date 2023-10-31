@@ -1,0 +1,25 @@
+moveit_setup_assistant_config:
+  urdf:
+    package: neo_mpo_700-2
+    relative_path: robot_model/mpo_700/mpo_700.urdf
+  srdf:
+    relative_path: config/mpo_700.srdf
+  package_settings:
+    author_name: Pradheep Padmanabhan
+    author_email: padmanabhan@neobotix.de
+    generated_timestamp: 1697538733
+  control_xacro:
+    command:
+      - position
+    state:
+      - position
+      - velocity
+  modified_urdf:
+    xacros:
+      - control_xacro
+  control_xacro:
+    command:
+      - position
+    state:
+      - position
+      - velocity

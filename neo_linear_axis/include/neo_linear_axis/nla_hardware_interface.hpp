@@ -32,7 +32,7 @@ public:
   void receive_loop();
 
 private:
-  double joint_position_commands_ = 0.0;
+  double joint_velocity_commands_ = 0.0;
   double joint_position_ = 0.0;
   double joint_velocity_ = 0.0;
   double timeout_ = 0.2;

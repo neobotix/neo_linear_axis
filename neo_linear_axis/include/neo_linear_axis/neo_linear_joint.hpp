@@ -67,6 +67,7 @@ public:
   void getJointPos(double & joint_position);
   void getJointVel(double & joint_velocity);
   void setJointPos(double & joint_position);
+  void setJointVel(double & joint_velocity);
   void checkSocketError(bool & isError);
   bool inSafetyRegion();
   void getGpioData(int32_t & dig_1, int32_t & dig_2);
@@ -93,12 +94,13 @@ private:
   
   double lookahead_time_ = 0.0; // hardcoding the values
   double targetPose_ = 0.0;
-  const double pGain_ = 7.0;
+  const double pGain_ = 6.0;
   const double homingGain_ = 0.15;
-  const double iGain_ = 85.0;
+  const double iGain_ = 20.0;
   double low_pass_ = 0.5;
   double last_vel_ = 0.0;
   double integral_ = 0.0;
+  double linearVel_ = 0.0;
 
   int syncCounter_;
   int heartbeatdivider_;
@@ -106,10 +108,13 @@ private:
   rclcpp::Logger logger_;
   bool safety_shift_ = false;
   bool motor_ready_ = false;
-  double last_command_ = 0.0;
+  double last_command_ = 1.0;
   int iter = 0;
   int goal_iter = 0;
   bool goal_reached_ = false;
+  bool command_sent = false;
+    bool motor_on = false;
+
 };
 
 #endif // NEO_LINEAR_AXIS__NEO_LINEAR_JOINT_HPP_

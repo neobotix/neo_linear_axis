@@ -88,6 +88,8 @@ CallbackReturn NlaHardwareInterface::on_init(const hardware_interface::HardwareI
   gpio_states_.resize(
     info_.gpios[0].state_interfaces.size(), std::numeric_limits<double>::quiet_NaN());
 
+  // joint_position_commands_ = 0.1;
+
   return CallbackReturn::SUCCESS;
 }
 
@@ -156,7 +158,7 @@ std::vector<hardware_interface::CommandInterface> NlaHardwareInterface::export_c
   // For now just handling positions, later will integrate the velocity and the torque interface
 
   command_interfaces.emplace_back(hardware_interface::CommandInterface(
-    info_.joints[0].name, hardware_interface::HW_IF_POSITION, &joint_position_commands_));
+    info_.joints[0].name, hardware_interface::HW_IF_VELOCITY, &joint_velocity_commands_));
 
   return command_interfaces;
 }
@@ -189,7 +191,7 @@ return_type NlaHardwareInterface::write(const rclcpp::Time &, const rclcpp::Dura
 
   RCLCPP_INFO_ONCE(logger_, "writing motors");
   if (linear_joint_->inSafetyRegion()) {
-    linear_joint_->setJointPos(joint_position_commands_);
+    linear_joint_->setJointVel(joint_velocity_commands_);
   }
 
   linear_joint_->updateMotor();

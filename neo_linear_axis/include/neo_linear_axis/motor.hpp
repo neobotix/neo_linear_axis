@@ -42,8 +42,8 @@ struct motor_t
   int32_t rot_sign = 0;         // motor rotation direction
   int32_t enc_ticks_per_rev = 10000;      // encoder ticks per motor revolution
   int32_t enc_home_offset = 0;      // encoder offset for true home position
-  int32_t max_vel_enc_s = 500000;     // max motor velocity in ticks/s (positive)
-  int32_t max_accel_enc_s = 500000;    // max motor acceleration in ticks/s^2 (positive)
+  int32_t max_vel_enc_s = 600000;     // max motor velocity in ticks/s (positive)
+  int32_t max_accel_enc_s = 600000;    // max motor acceleration in ticks/s^2 (positive)
   int32_t can_Tx_PDO1 = -1;
   int32_t can_Tx_PDO2 = -1;
   int32_t can_Rx_PDO2 = -1;
@@ -54,7 +54,9 @@ struct motor_t
   double meters_per_revolution = 0.01;
   int32_t target_radius_enc = 100;
   int32_t max_pos_error_enc = 5000;
-  int target_time_ms = 10;
+  int target_time_ms = 20;
+  int32_t modulo_max = 3000000;
+  int32_t modulo_min = -3000000;
 
   motor_state_e state = ST_PRE_INITIALIZED;
   int32_t curr_enc_pos_inc = 0;     // current encoder position value in ticks

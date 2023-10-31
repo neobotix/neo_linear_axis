@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="mpo_700">
+    <xacro:arg name="initial_positions_file" default="initial_positions.yaml" />
+
+    <!-- Import mpo_700 urdf file -->
+    <xacro:include filename="$(find neo_mpo_700-2)/robot_model/mpo_700/mpo_700.urdf" />
+
+    <!-- Import control_xacro -->
+    <xacro:include filename="mpo_700.ros2_control.xacro" />
+
+
+    <xacro:mpo_700_ros2_control name="FakeSystem" initial_positions_file="$(arg initial_positions_file)"/>
+
+</robot>

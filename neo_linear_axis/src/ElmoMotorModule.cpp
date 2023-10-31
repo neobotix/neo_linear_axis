@@ -162,7 +162,7 @@ void ElmoMotorModule::setCanIface(std::string & canIface)
 
 void ElmoMotorModule::setMotorModulo()
 {
-  const int32_t ticks_per_rev = motor_.enc_ticks_per_rev * motor_.gear_ratio;
+  int32_t ticks_per_rev =  static_cast<int>(motor_.enc_ticks_per_rev * motor_.gear_ratio / motor_.meters_per_revolution);
   canopen_set_int('X', 'M', 1, -1 * ticks_per_rev);
   canopen_set_int('X', 'M', 2, ticks_per_rev);
 
@@ -193,20 +193,29 @@ void ElmoMotorModule::enablePosMode()
 
   canSync();
 
-  // set Target Radius to X Increments
-  canopen_set_int('T', 'R', 1, motor_.target_radius_enc);
+  // // set Target Radius to X Increments
+  // canopen_set_int('T', 'R', 1, motor_.target_radius_enc);
+
+  // canSync();
+
+  // // set Target Time to X ms
+  // canopen_set_int('T', 'R', 2, motor_.target_time_ms);
+
+  // canSync();
+
+  // // set max position track error (see page 3-50 in elmo simpleiq)
+  // canopen_set_int('E', 'R', 3, motor_.max_pos_error_enc);
+
+  // set maximum acceleration to X Incr/s^2
+  canopen_set_int('A', 'C', 0, motor_.max_accel_enc_s);
+
+  // set maximum decceleration to X Incr/s^2
+  canopen_set_int('D', 'C', 0, motor_.max_accel_enc_s);
 
   canSync();
 
-  // set Target Time to X ms
-  canopen_set_int('T', 'R', 2, motor_.target_time_ms);
-
-  canSync();
-
-  // set max position track error (see page 3-50 in elmo simpleiq)
-  canopen_set_int('E', 'R', 3, motor_.max_pos_error_enc);
-
-  // ToDo: Need to set the velocity limits?
+  // set maximum and minimum velocity
+  canopen_set_int('S', 'P', 0, motor_.max_vel_enc_s);
 
   canSync();
 }
@@ -312,9 +321,12 @@ void ElmoMotorModule::motorSetVel(double & linVelms)
 void ElmoMotorModule::motorSetPos(double & jointPos)
 {
   const double motor_pos_rev = motor_.gear_ratio * jointPos / motor_.meters_per_revolution;
-  const int32_t motor_pos_inc = static_cast<int>(motor_pos_rev * motor_.enc_ticks_per_rev);
+  int32_t motor_pos_inc = static_cast<int>(motor_pos_rev * motor_.enc_ticks_per_rev);
 
-  canopen_set_int('P', 'A', 0, motor_pos_inc);
+  std::cout<<"curr_motor_pos_inc"<<motor_.curr_enc_pos_inc<<std::endl;
+
+  std::cout<<"motor_pos_inc"<<motor_pos_inc<<std::endl;
+  canopen_set_int('P', 'A', 0,  motor_pos_inc);
 }
 
 void ElmoMotorModule::setHomeDigIn(int & HomeDigIn)
@@ -388,6 +400,8 @@ void ElmoMotorModule::finishHoming()
   isHomed_ = true;
   isHoming_ = false;
   isMotorReset_ = true;
+  curr_pos_ = 0.0;
+  motor_.curr_enc_pos_inc = 0;
 }
 
 bool ElmoMotorModule::isHoming()
@@ -671,11 +685,7 @@ void ElmoMotorModule::handle(const can_msg_t & msg)
   }
 
   if ( (motor_.update_recv_time > last_sync_time_) ) {
-    curr_vel_ = currVel();
-    auto pose = curr_vel_ *(clock_.now() - last_update_time_).seconds();
-    last_update_time_ = clock_.now();
-    curr_pos_ += pose;
-    motor_.prev_enc_pos_inc = motor_.curr_enc_pos_inc;
+    curr_pos_ = currPose();
   }
   
 }
@@ -751,10 +761,6 @@ void ElmoMotorModule::handlePDO2(const can_msg_t & msg)
 
 double ElmoMotorModule::currPose()
 {
-  if (motor_.curr_enc_pos_inc < 0) {
-    motor_.curr_enc_pos_inc = 30000 - abs(motor_.curr_enc_pos_inc);
-  }
-
   return static_cast<double>(motor_.meters_per_revolution * std::abs(motor_.curr_enc_pos_inc - motor_.prev_enc_pos_inc)) /
          motor_.enc_ticks_per_rev / motor_.gear_ratio;
 }

@@ -62,7 +62,7 @@ void NeoLinearJoint::initMotor()
 
   // Disable watchdog
   motorOp_->setMotorModulo();
-  motorOp_->enableVelMode(); // Just for Homing
+  motorOp_->enablePosMode(); // Just for Homing
   motorOp_->resetPosCounter();
   motorOp_->configurePDOMapping();
   motorOp_->motorOn();
@@ -154,10 +154,22 @@ void NeoLinearJoint::setJointPos(double & joint_position)
     if(!motorOp_->isOperational() && !goal_reached_) {
       motorOp_->motorOn();
       iter = 0;
+      integral_ = 0.0;
     }
     if(goal_reached_){
-      if (abs(targetPose_ - currPose_) > 0.0005){
+      if (abs(targetPose_ - currPose_) > 0.002){
+        goal_iter_time_[goal_iter] = clock_.now();
+        goal_iter++;
+      }
+      if (goal_iter == 2) {
+        std::cout<<(goal_iter_time_[1] - goal_iter_time_[0]).nanoseconds() * 1.0 / 1000000000.0<<std::endl;
+        if (((goal_iter_time_[1] - goal_iter_time_[0]).nanoseconds() * 1.0 / 1000000000.0) > 0.02) {
+          goal_iter = 0;
+          RCLCPP_WARN(logger_, "Filtering trajectory");
+          return;
+        }
         goal_reached_ = false;
+        goal_iter = 0;
       }
     }
   }
@@ -169,6 +181,17 @@ bool NeoLinearJoint::inSafetyRegion()
     return true;
   }
   return false;
+}
+
+void NeoLinearJoint::setJointVel(double & joint_velocity)
+{
+  linearVel_ = joint_velocity;
+  if (abs(linearVel_) >= 0.005 && !motorOp_->isOperational()) {
+    motorOp_->motorOn();
+  }
+  if (abs(linearVel_) < 0.005 && motorOp_->isOperational()) {
+    motorOp_->motorOff();
+  }
 }
 
 void NeoLinearJoint::updateMotor()
@@ -186,9 +209,12 @@ void NeoLinearJoint::updateMotor()
 
   if (motorOp_->isReset()
     && motorOp_->isOperational()) {
-    RCLCPP_INFO(logger_, "Linear joint is operational");
     motor_ready_ = true;
     motorOp_->motorOff();
+    motorOp_->sendSyncMsg();
+    motorOp_->requestMotorStatus();
+    sleep(1);
+    RCLCPP_INFO(logger_, "Linear joint is operational");
   }
 
   // Start homing if not homed
@@ -215,55 +241,44 @@ void NeoLinearJoint::updateMotor()
   double poseDiff = 0.0;
   double linearVel = 0.001;
   currVel_ = motorOp_->getVel();
-  double start_pose = 0.11;
+  double start_pose = 0.1;
   double min_safety_pose = 0.1;
-  double max_safety_pose = 0.8;
+  double max_safety_pose = 0.6;
   double p_ctrl = 0.0;
   double i_ctrl = 0.0;
 
   // Motor ready after homing. then ready to get in position commands
   if (motor_ready_) {
-    if (!safety_shift_) {
-      if (!motorOp_->isOperational()){
-        motorOp_->motorOn();
+    if (!safety_shift_ && motor_on && motorOp_->isOperational()) {
+      if (!command_sent) {
+          // motorOp_->motorSetVel(vel);
+          // motorOp_->beginMotion();
+          RCLCPP_INFO(logger_, "sending to safety region");
+          motorOp_->motorSetPos(start_pose);
+          motorOp_->beginMotion();
+          command_sent = true;
       }
-      futurePose = currPose_ + currVel_ * lookahead_time_;
-      poseDiff = start_pose - futurePose;
 
-      linearVel = poseDiff * homingGain_;
-      motorOp_->motorSetVel(linearVel);
-      motorOp_->beginMotion();
-      if (abs(currPose_ - start_pose) <= 0.005) {
+      if (abs(currPose_ - start_pose) <= 0.001) {
         safety_shift_ = true;
         motorOp_->motorOff();
-        linearVel = 0;
-        motorOp_->motorSetVel(linearVel);
         RCLCPP_INFO(logger_, "Reached safety region");
         RCLCPP_INFO(logger_, "Ready to send position commands");
-        motorOp_->enablePosMode();
+        targetPose_ = currPose_;
+        return;
       }
-    } else {
-      if (currPose_ > max_safety_pose
-        || currPose_ < min_safety_pose) {
-        linearVel = 0;
-        motorOp_->motorSetVel(linearVel);
-        motorOp_->beginMotion();
-      } else {
+    }
+
+    if (safety_shift_)
+    {
+      // if (linearVel_ > 0.1
+      //   || linearVel_ < min_safety_pose) {
+      //   // RCLCPP_INFO(logger_, "Breaching the limits");
+      // } else {
         if (motorOp_->isOperational()) {
-          motorOp_->motorSetPos(targetPose_);
-          iter++;
-          // Stopping critera: stop the motor based on the progress
-          // Progress tolerance will be changed in the later version
-          if(iter == 50) {
-            if (abs(targetPose_ - last_command_) <= 0.0005){
-              motorOp_->motorOff();
-              goal_reached_ = true;
-            }
-            iter = 0;
-            last_command_ = targetPose_;
-          }
+            motorOp_->motorSetVel(linearVel_);
+            motorOp_->beginMotion();
         }      
-      }
     }
 
     syncCounter_++;
@@ -272,6 +287,11 @@ void NeoLinearJoint::updateMotor()
 
     last_sync_time_ = rclcpp::Clock().now();
     motorOp_->setSyncTime(last_sync_time_);
+
+    if (!safety_shift_ && !motorOp_->isOperational()){
+        motorOp_->motorOn();
+        motor_on = true;
+      }
 
     // // Status request checker
     if (syncCounter_ % statusdivider_ == 0) {
