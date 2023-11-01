@@ -37,8 +37,9 @@ private:
   double joint_velocity_ = 0.0;
   double timeout_ = 0.2;
   double homeVel_ = -0.03;
-  int homeDigIn_ = 5;
+  int homeDigIn_ = 7;
   double control_rate_ = 100.0;
+  double init_pos_ = 0.1;
 
   int heartbeat_divider_ = 5;
   int status_divider_ = 10;

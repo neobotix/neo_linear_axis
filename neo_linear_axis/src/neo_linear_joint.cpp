@@ -70,8 +70,6 @@ void NeoLinearJoint::initMotor()
   motorOp_->readIOs();
   RCLCPP_INFO(logger_, "Initializing done");
 
-  /*show error if any in the above initialization step*/
-
 }
 
 void NeoLinearJoint::setCanIface(std::string & canIface)
@@ -150,29 +148,7 @@ void NeoLinearJoint::getJointVel(double & joint_velocity)
 void NeoLinearJoint::setJointPos(double & joint_position)
 {
   targetPose_ = joint_position;
-  if (targetPose_ > 0.1) {
-    if(!motorOp_->isOperational() && !goal_reached_) {
-      motorOp_->motorOn();
-      iter = 0;
-      integral_ = 0.0;
-    }
-    if(goal_reached_){
-      if (abs(targetPose_ - currPose_) > 0.002){
-        goal_iter_time_[goal_iter] = clock_.now();
-        goal_iter++;
-      }
-      if (goal_iter == 2) {
-        std::cout<<(goal_iter_time_[1] - goal_iter_time_[0]).nanoseconds() * 1.0 / 1000000000.0<<std::endl;
-        if (((goal_iter_time_[1] - goal_iter_time_[0]).nanoseconds() * 1.0 / 1000000000.0) > 0.02) {
-          goal_iter = 0;
-          RCLCPP_WARN(logger_, "Filtering trajectory");
-          return;
-        }
-        goal_reached_ = false;
-        goal_iter = 0;
-      }
-    }
-  }
+  // ToDo: Forward the joint position to the motor controllers
 }
 
 bool NeoLinearJoint::inSafetyRegion()
@@ -182,6 +158,15 @@ bool NeoLinearJoint::inSafetyRegion()
   }
   return false;
 }
+
+// sets the initial position of the axis after homing
+
+void NeoLinearJoint::setInitPos(double & init_pos)
+{
+  init_pos_ = init_pos;
+}
+
+// sets the linear joint velocity
 
 void NeoLinearJoint::setJointVel(double & joint_velocity)
 {
@@ -223,7 +208,7 @@ void NeoLinearJoint::updateMotor()
     motorOp_->setHomeVel(homeVel_);
     motorOp_->startHoming();
   }
-    
+
   // Checking for homing status
 
   if (motorOp_->isHoming()) {
@@ -237,63 +222,45 @@ void NeoLinearJoint::updateMotor()
     }
   }
 
-  double futurePose = 0.0;
-  double poseDiff = 0.0;
-  double linearVel = 0.001;
-  currVel_ = motorOp_->getVel();
-  double start_pose = 0.1;
-  double min_safety_pose = 0.1;
-  double max_safety_pose = 0.6;
-  double p_ctrl = 0.0;
-  double i_ctrl = 0.0;
-
   // Motor ready after homing. then ready to get in position commands
   if (motor_ready_) {
-    if (!safety_shift_ && motor_on && motorOp_->isOperational()) {
+    if (!safety_shift_ &&
+      motor_on_ &&
+      motorOp_->isOperational()) {
       if (!command_sent) {
-          // motorOp_->motorSetVel(vel);
-          // motorOp_->beginMotion();
           RCLCPP_INFO(logger_, "sending to safety region");
-          motorOp_->motorSetPos(start_pose);
+          motorOp_->motorSetPos(init_pos_);
           motorOp_->beginMotion();
           command_sent = true;
       }
 
-      if (abs(currPose_ - start_pose) <= 0.001) {
+      if (abs(currPose_ - init_pos_) <= 0.001) {
         safety_shift_ = true;
         motorOp_->motorOff();
         RCLCPP_INFO(logger_, "Reached safety region");
         RCLCPP_INFO(logger_, "Ready to send position commands");
-        targetPose_ = currPose_;
-        return;
       }
     }
 
-    if (safety_shift_)
-    {
-      // if (linearVel_ > 0.1
-      //   || linearVel_ < min_safety_pose) {
-      //   // RCLCPP_INFO(logger_, "Breaching the limits");
-      // } else {
-        if (motorOp_->isOperational()) {
-            motorOp_->motorSetVel(linearVel_);
-            motorOp_->beginMotion();
-        }      
+    if (safety_shift_) {
+      if (motorOp_->isOperational()) {
+          motorOp_->motorSetVel(linearVel_);
+          motorOp_->beginMotion();
+      }      
     }
 
     syncCounter_++;
     motorOp_->sendSyncMsg();
-    // motorOp_->sendHeartBeat();
 
     last_sync_time_ = rclcpp::Clock().now();
     motorOp_->setSyncTime(last_sync_time_);
 
-    if (!safety_shift_ && !motorOp_->isOperational()){
+    if (!safety_shift_ && !motorOp_->isOperational()) {
         motorOp_->motorOn();
-        motor_on = true;
+        motor_on_ = true;
       }
 
-    // // Status request checker
+    // Status request checker
     if (syncCounter_ % statusdivider_ == 0) {
           motorOp_->requestMotorStatus();    // request status update
     }

@@ -78,7 +78,6 @@ public:
   void reqHomStatus();
   void shutdown();
   double getPose();
-  double getVel();
   void setSyncTime(rclcpp::Time last_sync_time);
   void checkSocketError(bool & isError);
   void setDigitalInput();

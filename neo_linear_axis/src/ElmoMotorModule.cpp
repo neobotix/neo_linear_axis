@@ -323,9 +323,6 @@ void ElmoMotorModule::motorSetPos(double & jointPos)
   const double motor_pos_rev = motor_.gear_ratio * jointPos / motor_.meters_per_revolution;
   int32_t motor_pos_inc = static_cast<int>(motor_pos_rev * motor_.enc_ticks_per_rev);
 
-  std::cout<<"curr_motor_pos_inc"<<motor_.curr_enc_pos_inc<<std::endl;
-
-  std::cout<<"motor_pos_inc"<<motor_pos_inc<<std::endl;
   canopen_set_int('P', 'A', 0,  motor_pos_inc);
 }
 
@@ -698,11 +695,6 @@ void ElmoMotorModule::setSyncTime(rclcpp::Time last_sync_time)
 double ElmoMotorModule::getPose()
 {
   return curr_pos_;
-}
-
-double ElmoMotorModule::getVel()
-{
-  return curr_vel_;
 }
 
 void ElmoMotorModule::digInStates(int32_t & dig_1, int32_t & dig_2)

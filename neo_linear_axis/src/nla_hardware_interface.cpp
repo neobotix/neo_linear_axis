@@ -44,37 +44,35 @@ CallbackReturn NlaHardwareInterface::on_init(const hardware_interface::HardwareI
   
   if (info_.hardware_parameters.count("can_iface") > 0) {
     canIface_ = info_.hardware_parameters.at("can_iface");
+    RCLCPP_INFO(logger_, "can_iface for the system is set to %s", canIface_.c_str());
   } else {
-    RCLCPP_WARN(logger_, "can_iface not specified in the URDF.");
+    RCLCPP_WARN(logger_, "can_iface not specified in the URDF. Defaults to can0");
   }
 
   if (info_.hardware_parameters.count("timeout") > 0) {
     timeout_ = std::stod(info_.hardware_parameters.at("timeout"));
+    RCLCPP_INFO(logger_, "timeout_ for motor is set to %f", timeout_);
   } else {
-    RCLCPP_WARN(logger_, "motor timeout not specified in the URDF.");
-  }
-
-  if (info_.hardware_parameters.count("homeVel") > 0) {
-    homeVel_ = std::stod(info_.hardware_parameters.at("homeVel"));
-  } else {
-    RCLCPP_WARN(logger_, "Homing velocity not specified in the URDF.");
+    RCLCPP_WARN(logger_, "motor timeout not specified in the URDF. Defaults to 0.2 s");
   }
 
   if (info_.hardware_parameters.count("control_rate") > 0) {
     control_rate_ = std::stod(info_.hardware_parameters.at("control_rate"));
+    RCLCPP_INFO(logger_, "control_rate_ for motor is set to %f", control_rate_);
   } else {
-    RCLCPP_WARN(logger_, "control_rate not specified in the URDF.");
+    RCLCPP_WARN(logger_, "control_rate not specified in the URDF. Defaults to 100.0 Hz");
   }
 
-  if (info_.hardware_parameters.count("homeDigIn") > 0) {
-    homeDigIn_ = std::stoi(info_.hardware_parameters.at("homeDigIn"));
+  if (info_.hardware_parameters.count("initial_pose") > 0) {
+    init_pos_ = std::stod(info_.hardware_parameters.at("init_pos_"));
+    RCLCPP_INFO(logger_, "Setting the inital pose to %f", init_pos_);
   } else {
-    homeDigIn_ = 7;
-    RCLCPP_WARN(logger_, "Homing digital input not specified in the URDF.");
+    RCLCPP_WARN(logger_, "inital pose not specified in the URDF. Defaults to 0.1 m");
   }
 
   // Get all the necessary parameters for the motors
   linear_joint_ = std::make_unique<NeoLinearJoint>(motor, logger_);
+  linear_joint_->setInitPos(init_pos_);
   linear_joint_->setClock(clock_);
   linear_joint_->setMotorTimeout(timeout_);
   linear_joint_->setHomeVel(homeVel_);
@@ -87,8 +85,6 @@ CallbackReturn NlaHardwareInterface::on_init(const hardware_interface::HardwareI
 
   gpio_states_.resize(
     info_.gpios[0].state_interfaces.size(), std::numeric_limits<double>::quiet_NaN());
-
-  // joint_position_commands_ = 0.1;
 
   return CallbackReturn::SUCCESS;
 }
@@ -155,7 +151,7 @@ std::vector<hardware_interface::CommandInterface> NlaHardwareInterface::export_c
   std::vector<hardware_interface::CommandInterface> command_interfaces;
   command_interfaces.reserve(1);
 
-  // For now just handling positions, later will integrate the velocity and the torque interface
+  // For now just handling velocities, later will integrate the position and the torque interface
 
   command_interfaces.emplace_back(hardware_interface::CommandInterface(
     info_.joints[0].name, hardware_interface::HW_IF_VELOCITY, &joint_velocity_commands_));
@@ -165,6 +161,7 @@ std::vector<hardware_interface::CommandInterface> NlaHardwareInterface::export_c
 
 void NlaHardwareInterface::receive_loop()
 {
+  // Send request for reading the motor data
   while(rclcpp::ok())
   {
     linear_joint_->readMotor();
@@ -190,12 +187,14 @@ return_type NlaHardwareInterface::write(const rclcpp::Time &, const rclcpp::Dura
 {
 
   RCLCPP_INFO_ONCE(logger_, "writing motors");
+
+  // Joint velocities are set only after homing is done
   if (linear_joint_->inSafetyRegion()) {
     linear_joint_->setJointVel(joint_velocity_commands_);
   }
 
+  // Send commands to motor commands
   linear_joint_->updateMotor();
-
 
   return return_type::OK;
 }
