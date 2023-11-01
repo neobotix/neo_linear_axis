@@ -22,11 +22,15 @@
   <depend>lifecycle_msgs</depend>
   <depend>hardware_interface</depend>
   <depend>pluginlib</depend>
+  <depend>ros2controlcli</depend>
+  <depend>joint_state_broadcaster</depend>
+  <depend>ros2_control</depend>
+  <depend>ros2_controllers</depend>
+  <depend>rqt_joint_trajectory_controller</depend>
   <depend>rclcpp_lifecycle</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
-  <test_depend>ament_add_gmock</test_depend>
   <test_depend>hardware_interface</test_depend>
 
   <export>
