@@ -64,7 +64,7 @@ CallbackReturn NlaHardwareInterface::on_init(const hardware_interface::HardwareI
   }
 
   if (info_.hardware_parameters.count("initial_pose") > 0) {
-    init_pos_ = std::stod(info_.hardware_parameters.at("init_pos_"));
+    init_pos_ = std::stod(info_.hardware_parameters.at("initial_pose"));
     RCLCPP_INFO(logger_, "Setting the inital pose to %f", init_pos_);
   } else {
     RCLCPP_WARN(logger_, "inital pose not specified in the URDF. Defaults to 0.1 m");
