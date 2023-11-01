@@ -11,4 +11,4 @@ moveit_simple_controller_manager:
     action_ns: follow_joint_trajectory
     default: true
     joints:
-      - linear_axis_joint2
+      - linear_axis_slide_joint

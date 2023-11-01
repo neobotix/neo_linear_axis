@@ -1,4 +1,4 @@
 # Default initial positions for mpo_700's ros2_control fake system
 
 initial_positions:
-  linear_axis_joint2: 0
+  linear_axis_slide_joint: 0
