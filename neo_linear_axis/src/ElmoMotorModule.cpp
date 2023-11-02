@@ -407,6 +407,13 @@ bool ElmoMotorModule::checkHomingDone()
     motor_.homing_state = 2;
   }
 
+  if (dig_ins_[1] == 1) {
+    RCLCPP_INFO(logger_, "Linear axis reached the home position");
+    finishHoming();
+    stopMotion();
+    return true;
+  }
+
   // Check for restart
   if (motor_.homing_state == -2) {
     armHoming();

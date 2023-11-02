@@ -213,6 +213,8 @@ void NeoLinearJoint::updateMotor()
   if (!motorOp_->isHomed()) {
     motorOp_->setHomeVel(homeVel_);
     motorOp_->startHoming();
+    motorOp_->readIOs();
+    motorOp_->requestMotorStatus();
   }
 
   // Checking for homing status
