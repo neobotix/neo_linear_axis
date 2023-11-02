@@ -753,7 +753,7 @@ void ElmoMotorModule::handlePDO2(const can_msg_t & msg)
 
 double ElmoMotorModule::currPose()
 {
-  return static_cast<double>(motor_.meters_per_revolution * std::abs(motor_.curr_enc_pos_inc - motor_.prev_enc_pos_inc)) /
+  return static_cast<double>(motor_.meters_per_revolution * motor_.curr_enc_pos_inc) /
          motor_.enc_ticks_per_rev / motor_.gear_ratio;
 }
 

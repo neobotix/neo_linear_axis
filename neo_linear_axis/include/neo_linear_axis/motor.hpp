@@ -42,8 +42,8 @@ struct motor_t
   int32_t rot_sign = 0;         // motor rotation direction
   int32_t enc_ticks_per_rev = 10000;      // encoder ticks per motor revolution
   int32_t enc_home_offset = 0;      // encoder offset for true home position
-  int32_t max_vel_enc_s = 600000;     // max motor velocity in ticks/s (positive)
-  int32_t max_accel_enc_s = 600000;    // max motor acceleration in ticks/s^2 (positive)
+  int32_t max_vel_enc_s = 500000;     // max motor velocity in ticks/s (positive)
+  int32_t max_accel_enc_s = 500000;    // max motor acceleration in ticks/s^2 (positive)
   int32_t can_Tx_PDO1 = -1;
   int32_t can_Tx_PDO2 = -1;
   int32_t can_Rx_PDO2 = -1;
