@@ -197,9 +197,22 @@ return_type NlaHardwareInterface::write(const rclcpp::Time &, const rclcpp::Dura
 
   // Joint velocities are set only after homing is done
   if (linear_joint_->inSafetyRegion()) {
-    linear_joint_->setJointVel(joint_velocity_commands_);
+    if (abs(joint_velocity_commands_) > 0) {
+      /** Currently, JTC holds position while cancelling the goal. 
+       * This eventually holds the velocity as well, causing the axis not to stop.
+       * Below is the solution for holding the goal. 
+       * It will be further researched
+       * https://github.com/neobotix/neo_linear_axis/issues/9
+      **/
+      if (abs(last_velocity_command - joint_velocity_commands_) > 1e-9 )
+      {
+        linear_joint_->setJointVel(joint_velocity_commands_);
+      } else {
+        linear_joint_->stopMotion();
+      }
+    }
   }
-
+  last_velocity_command = joint_velocity_commands_;
   // Send commands to motor commands
   linear_joint_->updateMotor();
 

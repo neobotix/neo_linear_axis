@@ -21,6 +21,7 @@ public:
   CallbackReturn on_configure(const rclcpp_lifecycle::State & /*info*/) override;
   CallbackReturn on_activate(const rclcpp_lifecycle::State & /*info*/) override;
   CallbackReturn on_deactivate(const rclcpp_lifecycle::State & /*info*/) override;
+  CallbackReturn on_error(const rclcpp_lifecycle::State & /*info*/) override;
   std::vector<hardware_interface::StateInterface> export_state_interfaces() override;
   std::vector<hardware_interface::CommandInterface> export_command_interfaces() override;
 
@@ -33,6 +34,7 @@ public:
 
 private:
   double joint_velocity_commands_ = 0.0;
+  double last_velocity_command = 0.0;
   double joint_position_ = 0.0;
   double joint_velocity_ = 0.0;
   double timeout_ = 0.2;
