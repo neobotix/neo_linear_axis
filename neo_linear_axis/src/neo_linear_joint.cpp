@@ -126,9 +126,15 @@ void NeoLinearJoint::getGpioData(
   motorOp_->digInStates(dig_1, dig_2);
 }
 
+void NeoLinearJoint::stopMotion()
+{
+  motorOp_->stopMotion();
+  motorOp_->motorOff();
+}
+
 void NeoLinearJoint::shutdown()
 {
-  motorOp_->motorOff();
+  motorOp_->shutdown();
 }
 
 // Gives back the linear position of the joint

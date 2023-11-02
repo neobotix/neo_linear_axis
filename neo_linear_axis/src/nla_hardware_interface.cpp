@@ -120,6 +120,13 @@ CallbackReturn NlaHardwareInterface::on_deactivate(const rclcpp_lifecycle::State
   return CallbackReturn::SUCCESS;
 }
 
+CallbackReturn NlaHardwareInterface::on_error(const rclcpp_lifecycle::State & /*info*/)
+{
+  RCLCPP_INFO(logger_, "Error received, stopping the motor");
+  linear_joint_->stopMotion();
+  return CallbackReturn::SUCCESS;
+}
+
 std::vector<hardware_interface::StateInterface> NlaHardwareInterface::export_state_interfaces()
 {
   std::vector<hardware_interface::StateInterface> state_interfaces;

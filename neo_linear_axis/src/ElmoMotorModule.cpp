@@ -137,24 +137,6 @@ void ElmoMotorModule::transmitCan(const can_msg_t & msg)
   }
 }
 
-void ElmoMotorModule::shutdown()
-{
-  {
-    // std::lock_guard<std::mutex> lock(m_node_mutex);
-
-    // disable waiting for CAN socket, since we are shutting down
-    waitForCanSock_ = false;
-    shutdown_ = true;
-  }
-  {
-    // std::lock_guard<std::mutex> lock(m_can_mutex);
-    if (canSock_ >= 0) {
-      ::close(canSock_);
-      canSock_ = -1;
-    }
-  }
-}
-
 void ElmoMotorModule::setCanIface(std::string & canIface)
 {
   canIface_ = canIface;
@@ -660,16 +642,24 @@ void ElmoMotorModule::readMotor()
     }
     waitForCanSock_ = true;     // enable waiting again
   }
+}
+
+void ElmoMotorModule::shutdown()
+{
+  stopMotion();
+  motorOff();
 
   // close socket
-  // {
-  //   // std::lock_guard<std::mutex> lock(m_can_mutex);
-  //   if (canSock_ >= 0) {
-  //     ::close(canSock_);
-  //     canSock_ = -1;
-  //   }
-  //   can_condtion_.notify_all();     // notify that socket is closed
-  // }
+  {
+    std::lock_guard<std::mutex> lock(can_mutex_);
+    if (canSock_ >= 0) {
+      ::close(canSock_);
+      RCLCPP_INFO(logger_, "CAN communication is closed");
+      canSock_ = -1;
+    }
+    can_condtion_.notify_all();     // notify that socket is closed
+  }
+
 }
 
 void ElmoMotorModule::handle(const can_msg_t & msg)

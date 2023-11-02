@@ -72,6 +72,8 @@ public:
   void checkSocketError(bool & isError);
   bool inSafetyRegion();
   void getGpioData(int32_t & dig_1, int32_t & dig_2);
+  void stopMotion();
+  void motorOff();
 
   // void sdoDownload(
   //   int & node_id, int32_t obj_index, int32_t obj_sub_index,
