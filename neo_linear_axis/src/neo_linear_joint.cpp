@@ -204,7 +204,6 @@ void NeoLinearJoint::updateMotor()
     motorOp_->motorOff();
     motorOp_->sendSyncMsg();
     motorOp_->requestMotorStatus();
-    sleep(1);
     RCLCPP_INFO(logger_, "Linear joint is operational");
   }
 
