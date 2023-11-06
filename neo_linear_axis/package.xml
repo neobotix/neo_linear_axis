@@ -28,6 +28,7 @@
   <depend>ros2_controllers</depend>
   <depend>rqt_joint_trajectory_controller</depend>
   <depend>rclcpp_lifecycle</depend>
+  <depend>neo_msgs2</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

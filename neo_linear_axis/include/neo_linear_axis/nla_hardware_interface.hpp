@@ -9,6 +9,8 @@
 #include "neo_linear_axis/motor.hpp"
 #include "neo_linear_axis/neo_linear_joint.hpp"
 
+#include "neo_msgs2/msg/emergency_stop_state.hpp"
+
 using hardware_interface::CallbackReturn;
 using hardware_interface::return_type;
 
@@ -50,10 +52,15 @@ private:
   std::thread read_thread_;
 
   rclcpp::Clock clock_;
+  rclcpp::Node::SharedPtr helperNode_;
 
   std::unique_ptr<NeoLinearJoint> linear_joint_;
   std::vector<double> gpio_states_;
   motor_t motor;
+  bool emstop_ = true;
+
+  rclcpp::Subscription<neo_msgs2::msg::EmergencyStopState>::SharedPtr sub_emergency_stop_;
+  void emergency_stop_callback(const neo_msgs2::msg::EmergencyStopState::SharedPtr state);
 
 // Check for other functions that needs to be included and overrided. 
 };

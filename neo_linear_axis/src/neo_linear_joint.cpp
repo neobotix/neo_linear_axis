@@ -65,7 +65,6 @@ void NeoLinearJoint::initMotor()
   motorOp_->enablePosMode(); // Just for Homing
   motorOp_->resetPosCounter();
   motorOp_->configurePDOMapping();
-  motorOp_->motorOn();
   motorOp_->requestMotorStatus();
   motorOp_->readIOs();
   RCLCPP_INFO(logger_, "Initializing done");
@@ -130,6 +129,11 @@ void NeoLinearJoint::stopMotion()
 {
   motorOp_->stopMotion();
   motorOp_->motorOff();
+}
+
+void NeoLinearJoint::setEMState(bool EMState)
+{
+  EMState_ = EMState;
 }
 
 void NeoLinearJoint::shutdown()
@@ -209,7 +213,10 @@ void NeoLinearJoint::updateMotor()
 
   // Start homing if not homed
 
-  if (!motorOp_->isHomed()) {
+  if (!motorOp_->isHomed() && !EMState_) {
+    if (!motorOp_->isOperational()) {
+      motorOp_->motorOn();
+    }
     motorOp_->setHomeVel(homeVel_);
     motorOp_->startHoming();
     motorOp_->readIOs();
@@ -221,6 +228,7 @@ void NeoLinearJoint::updateMotor()
   if (motorOp_->isHoming()) {
     if (!motorOp_->isOperational()) {
       RCLCPP_WARN(logger_, "Homing interrupted");
+      motorOp_->setIsHoming(EMState_);
     } else if (motorOp_->checkHomingDone()) {
       RCLCPP_INFO(logger_, "Homing finished");
       motorOp_->finishHoming();

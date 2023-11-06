@@ -74,6 +74,7 @@ public:
   void getGpioData(int32_t & dig_1, int32_t & dig_2);
   void stopMotion();
   void motorOff();
+  void setEMState(bool EMState);
 
   // void sdoDownload(
   //   int & node_id, int32_t obj_index, int32_t obj_sub_index,
@@ -109,6 +110,8 @@ private:
 
   bool command_sent = false;
   bool motor_on_ = false;
+
+  bool EMState_ = true;
 
 };
 

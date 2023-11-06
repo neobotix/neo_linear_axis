@@ -85,6 +85,7 @@ public:
   void readIOs();
   void digInStates(int32_t & dig_1, int32_t & dig_2);
   double currVel();
+  void setIsHoming(bool isHoming);
 
 private:
   void canopen_set_int(char cmd_char_1, char cmd_char_2, int32_t index, int32_t data);

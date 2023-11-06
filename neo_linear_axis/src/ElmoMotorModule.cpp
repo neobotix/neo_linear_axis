@@ -225,6 +225,11 @@ void ElmoMotorModule::stopMotion()
   canSync();
 }
 
+void ElmoMotorModule::setIsHoming(bool isHoming)
+{
+  isHoming_ = isHoming;
+}
+
 void ElmoMotorModule::startHoming()
 {
   if (isHoming_ ) {

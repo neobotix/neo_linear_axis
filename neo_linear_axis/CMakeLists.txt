@@ -26,6 +26,8 @@ find_package(rclcpp_lifecycle REQUIRED)
 find_package(hardware_interface REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(control_msgs REQUIRED)
+find_package(neo_msgs2 REQUIRED)
+
 
 add_library(neo_linear_axis 
   SHARED
@@ -51,6 +53,7 @@ ament_target_dependencies(
   "rclcpp_lifecycle"
   "hardware_interface"
   "pluginlib"
+  "neo_msgs2"
 )
 
 pluginlib_export_plugin_description_file(

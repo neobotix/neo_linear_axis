@@ -27,9 +27,17 @@ SOFTWARE.
 #include "rclcpp/rclcpp.hpp"
 #include <neo_linear_axis/nla_hardware_interface.hpp>
 
+using std::placeholders::_1;
+
 namespace nla {
 
-NlaHardwareInterface::NlaHardwareInterface(){}
+NlaHardwareInterface::NlaHardwareInterface(){
+  helperNode_ = std::make_shared<rclcpp::Node>("linear_axis_helper_node");
+  sub_emergency_stop_ = helperNode_->create_subscription<neo_msgs2::msg::EmergencyStopState>(
+      "emergency_stop_state", 1, std::bind(
+        &NlaHardwareInterface::emergency_stop_callback, this,
+        _1));
+}
 
 NlaHardwareInterface::~NlaHardwareInterface(){
     RCLCPP_INFO(logger_, "Shutting down");
@@ -96,6 +104,7 @@ CallbackReturn NlaHardwareInterface::on_configure(const rclcpp_lifecycle::State 
     bool socketError;
     linear_joint_->openSocket();
     linear_joint_->checkSocketError(socketError);
+    linear_joint_->setEMState(emstop_);
     if (socketError) {
       return CallbackReturn::ERROR;
     }
@@ -187,6 +196,8 @@ return_type NlaHardwareInterface::read(const rclcpp::Time &, const rclcpp::Durat
   gpio_states_[0] = static_cast<double>(gpio_states[0]);
   gpio_states_[1] = static_cast<double>(gpio_states[1]);
 
+  rclcpp::spin_some(helperNode_); //for reading emstop
+
   return return_type::OK;
 }
 
@@ -194,21 +205,30 @@ return_type NlaHardwareInterface::write(const rclcpp::Time &, const rclcpp::Dura
 {
 
   RCLCPP_INFO_ONCE(logger_, "writing motors");
-
-  // Joint velocities are set only after homing is done
-  if (linear_joint_->inSafetyRegion()) {
-    if (abs(joint_velocity_commands_) > 0) {
-      /** Currently, JTC holds position while cancelling the goal. 
-       * This eventually holds the velocity as well, causing the axis not to stop.
-       * Below is the solution for holding the goal. 
-       * It will be further researched
-       * https://github.com/neobotix/neo_linear_axis/issues/9
-      **/
-      if (abs(last_velocity_command - joint_velocity_commands_) > 1e-9 )
-      {
-        linear_joint_->setJointVel(joint_velocity_commands_);
-      } else {
-        linear_joint_->stopMotion();
+ 
+  if (emstop_) {
+    // ToDo: Add logging time has parameter
+    RCLCPP_INFO_THROTTLE(logger_, clock_, 6000.0,
+      "linear_axis is in EMSTOP");
+    linear_joint_->stopMotion();
+  } else {
+    // Joint velocities are set only after homing is done
+    if (linear_joint_->inSafetyRegion()) {
+      RCLCPP_INFO_THROTTLE(logger_, clock_, 100000.0,
+        "Linear axis is active");
+      if (abs(joint_velocity_commands_) > 0) {
+        /** Currently, JTC holds position while cancelling the goal. 
+         * This eventually holds the velocity as well, causing the axis not to stop.
+         * Below is the solution for holding the goal. 
+         * It will be further researched
+         * https://github.com/neobotix/neo_linear_axis/issues/9
+        **/
+        if (abs(last_velocity_command - joint_velocity_commands_) > 1e-9 )
+        {
+          linear_joint_->setJointVel(joint_velocity_commands_);
+        } else {
+          linear_joint_->stopMotion();
+        }
       }
     }
   }
@@ -217,6 +237,18 @@ return_type NlaHardwareInterface::write(const rclcpp::Time &, const rclcpp::Dura
   linear_joint_->updateMotor();
 
   return return_type::OK;
+}
+
+void NlaHardwareInterface::emergency_stop_callback(const neo_msgs2::msg::EmergencyStopState::SharedPtr state)
+{
+    if (state->emergency_state == neo_msgs2::msg::EmergencyStopState::EMSTOP) {
+       emstop_ = true;
+       linear_joint_->setEMState(emstop_);
+    }
+    if (state->emergency_state == neo_msgs2::msg::EmergencyStopState::EMFREE) {
+       emstop_ = false;
+       linear_joint_->setEMState(emstop_);
+    }
 }
 
 } // namespace nla
