@@ -4,7 +4,7 @@
   <name>neo_linear_moveit</name>
   <version>0.3.0</version>
   <description>
-     An automatically generated package with all the configuration and launch files for using the mpo_700 with the MoveIt Motion Planning Framework
+     An automatically generated package with all the configuration and launch files for using the rox with the MoveIt Motion Planning Framework
   </description>
   <maintainer email="padmanabhan@neobotix.de">Pradheep Padmanabhan</maintainer>
 
@@ -36,7 +36,7 @@
   <exec_depend>moveit_ros_visualization</exec_depend>
   <exec_depend>moveit_ros_warehouse</exec_depend>
   <exec_depend>moveit_setup_assistant</exec_depend>
-  <exec_depend>neo_mpo_700-2</exec_depend>
+  <exec_depend>rox_description</exec_depend>
   <exec_depend>robot_state_publisher</exec_depend>
   <exec_depend>rviz2</exec_depend>
   <exec_depend>rviz_common</exec_depend>

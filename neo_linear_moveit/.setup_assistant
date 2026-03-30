@@ -1,9 +1,9 @@
 moveit_setup_assistant_config:
   urdf:
-    package: neo_mpo_700-2
-    relative_path: robot_model/mpo_700/mpo_700.urdf
+    package: rox_description
+    relative_path: urdf/rox.urdf.xacro
   srdf:
-    relative_path: config/mpo_700.srdf
+    relative_path: config/rox.srdf
   package_settings:
     author_name: Pradheep Padmanabhan
     author_email: padmanabhan@neobotix.de

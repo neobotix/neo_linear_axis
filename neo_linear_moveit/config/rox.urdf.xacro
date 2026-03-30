@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="rox">
+    <xacro:arg name="initial_positions_file" default="initial_positions.yaml" />
+    <xacro:arg name="rox_type" default="argo" />
+    <xacro:arg name="enable_linear_axis" default="true" />
+    <xacro:arg name="use_mock_hardware" default="true" />
+
+    <!-- Import rox urdf file -->
+    <xacro:include filename="$(find rox_description)/urdf/rox.urdf.xacro" />
+
+    <!-- Import control_xacro -->
+    <xacro:include filename="rox.ros2_control.xacro" />
+
+
+    <xacro:rox_ros2_control name="FakeSystem" initial_positions_file="$(arg initial_positions_file)"/>
+
+</robot>
