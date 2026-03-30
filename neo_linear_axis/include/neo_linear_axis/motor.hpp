@@ -38,7 +38,7 @@ enum motor_state_e
 struct motor_t
 {
   std::string joint_name;         // ROS joint name
-  int32_t node_id = 2;          // motor "CAN ID"
+  int32_t node_id = 127;          // motor "CAN ID"
   int32_t rot_sign = 0;         // motor rotation direction
   int32_t enc_ticks_per_rev = 10000;      // encoder ticks per motor revolution
   int32_t enc_home_offset = 0;      // encoder offset for true home position
@@ -49,9 +49,9 @@ struct motor_t
   int32_t can_Rx_PDO2 = -1;
   int32_t can_Tx_SDO = -1;
   int32_t can_Rx_SDO = -1;
-  int32_t gear_ratio = 3;         // gear ratio
+  int32_t gear_ratio = 5;         // gear ratio
   double torque_constant = 0;       // conversion factor from current to torque
-  double meters_per_revolution = 0.01;
+  double meters_per_revolution = 0.025;
   int32_t target_radius_enc = 100;
   int32_t max_pos_error_enc = 5000;
   int target_time_ms = 20;

@@ -40,46 +40,46 @@ NlaHardwareInterface::NlaHardwareInterface(){
 }
 
 NlaHardwareInterface::~NlaHardwareInterface(){
-    RCLCPP_INFO(logger_, "Shutting down");
+    RCLCPP_INFO(get_logger(), "Shutting down");
   linear_joint_->shutdown();
 }
 
-CallbackReturn NlaHardwareInterface::on_init(const hardware_interface::HardwareInfo & info)
+CallbackReturn NlaHardwareInterface::on_init(const hardware_interface::HardwareComponentInterfaceParams & params)
 {
-  if (hardware_interface::SystemInterface::on_init(info) != hardware_interface::CallbackReturn::SUCCESS) {
+  if (hardware_interface::SystemInterface::on_init(params) != hardware_interface::CallbackReturn::SUCCESS) {
     return hardware_interface::CallbackReturn::ERROR;
   }
   
   if (info_.hardware_parameters.count("can_iface") > 0) {
     canIface_ = info_.hardware_parameters.at("can_iface");
-    RCLCPP_INFO(logger_, "can_iface for the system is set to %s", canIface_.c_str());
+    RCLCPP_INFO(get_logger(), "can_iface for the system is set to %s", canIface_.c_str());
   } else {
-    RCLCPP_WARN(logger_, "can_iface not specified in the URDF. Defaults to can0");
+    RCLCPP_WARN(get_logger(), "can_iface not specified in the URDF. Defaults to can0");
   }
 
   if (info_.hardware_parameters.count("timeout") > 0) {
     timeout_ = std::stod(info_.hardware_parameters.at("timeout"));
-    RCLCPP_INFO(logger_, "timeout_ for motor is set to %f", timeout_);
+    RCLCPP_INFO(get_logger(), "timeout_ for motor is set to %f", timeout_);
   } else {
-    RCLCPP_WARN(logger_, "motor timeout not specified in the URDF. Defaults to 0.2 s");
+    RCLCPP_WARN(get_logger(), "motor timeout not specified in the URDF. Defaults to 0.2 s");
   }
 
   if (info_.hardware_parameters.count("control_rate") > 0) {
     control_rate_ = std::stod(info_.hardware_parameters.at("control_rate"));
-    RCLCPP_INFO(logger_, "control_rate_ for motor is set to %f", control_rate_);
+    RCLCPP_INFO(get_logger(), "control_rate_ for motor is set to %f", control_rate_);
   } else {
-    RCLCPP_WARN(logger_, "control_rate not specified in the URDF. Defaults to 100.0 Hz");
+    RCLCPP_WARN(get_logger(), "control_rate not specified in the URDF. Defaults to 100.0 Hz");
   }
 
   if (info_.hardware_parameters.count("initial_pose") > 0) {
     init_pos_ = std::stod(info_.hardware_parameters.at("initial_pose"));
-    RCLCPP_INFO(logger_, "Setting the inital pose to %f", init_pos_);
+    RCLCPP_INFO(get_logger(), "Setting the inital pose to %f", init_pos_);
   } else {
-    RCLCPP_WARN(logger_, "inital pose not specified in the URDF. Defaults to 0.1 m");
+    RCLCPP_WARN(get_logger(), "inital pose not specified in the URDF. Defaults to 0.1 m");
   }
 
   // Get all the necessary parameters for the motors
-  linear_joint_ = std::make_unique<NeoLinearJoint>(motor, logger_);
+  linear_joint_ = std::make_unique<NeoLinearJoint>(motor, get_logger());
   linear_joint_->setInitPos(init_pos_);
   linear_joint_->setClock(clock_);
   linear_joint_->setMotorTimeout(timeout_);
@@ -90,9 +90,6 @@ CallbackReturn NlaHardwareInterface::on_init(const hardware_interface::HardwareI
     heartbeat_divider_,
     status_divider_); // Setting dummy for now
   linear_joint_->setCanIface(canIface_); // Setting dummy for now
-
-  gpio_states_.resize(
-    info_.gpios[0].state_interfaces.size(), std::numeric_limits<double>::quiet_NaN());
 
   return CallbackReturn::SUCCESS;
 }
@@ -116,7 +113,7 @@ CallbackReturn NlaHardwareInterface::on_configure(const rclcpp_lifecycle::State 
 CallbackReturn NlaHardwareInterface::on_activate(const rclcpp_lifecycle::State & )
 {
   // Starting the motors
-  RCLCPP_INFO(logger_, "Initializing motors");
+  RCLCPP_INFO(get_logger(), "Initializing motors");
   linear_joint_->initMotor();
   read_thread_ = std::thread(&NlaHardwareInterface::receive_loop, this);
   return CallbackReturn::SUCCESS;
@@ -124,55 +121,16 @@ CallbackReturn NlaHardwareInterface::on_activate(const rclcpp_lifecycle::State &
 
 CallbackReturn NlaHardwareInterface::on_deactivate(const rclcpp_lifecycle::State & /*info*/)
 {
-  RCLCPP_INFO(logger_, "Shutting down");
+  RCLCPP_INFO(get_logger(), "Shutting down");
   linear_joint_->shutdown();
   return CallbackReturn::SUCCESS;
 }
 
 CallbackReturn NlaHardwareInterface::on_error(const rclcpp_lifecycle::State & /*info*/)
 {
-  RCLCPP_INFO(logger_, "Error received, stopping the motor");
+  RCLCPP_INFO(get_logger(), "Error received, stopping the motor");
   linear_joint_->stopMotion();
   return CallbackReturn::SUCCESS;
-}
-
-std::vector<hardware_interface::StateInterface> NlaHardwareInterface::export_state_interfaces()
-{
-  std::vector<hardware_interface::StateInterface> state_interfaces;
-  state_interfaces.reserve(4);
-
-  // For now just handling positions, later will integrate the velocity and the torque interface
-
-  state_interfaces.emplace_back(hardware_interface::StateInterface(
-    info_.joints[0].name, hardware_interface::HW_IF_POSITION, &joint_position_
-    ));
-
-  state_interfaces.emplace_back(hardware_interface::StateInterface(
-    info_.joints[0].name, hardware_interface::HW_IF_VELOCITY, &joint_velocity_
-    ));
-
-  state_interfaces.emplace_back(hardware_interface::StateInterface(
-    info_.gpios[0].name, "dig_in_" + std::to_string(1), &gpio_states_[0]
-    ));
-
-  state_interfaces.emplace_back(hardware_interface::StateInterface(
-    info_.gpios[0].name, "dig_in_" + std::to_string(2), &gpio_states_[1]
-    ));
-
-  return state_interfaces;
-}
-
-std::vector<hardware_interface::CommandInterface> NlaHardwareInterface::export_command_interfaces()
-{
-  std::vector<hardware_interface::CommandInterface> command_interfaces;
-  command_interfaces.reserve(1);
-
-  // For now just handling velocities, later will integrate the position and the torque interface
-
-  command_interfaces.emplace_back(hardware_interface::CommandInterface(
-    info_.joints[0].name, hardware_interface::HW_IF_VELOCITY, &joint_velocity_commands_));
-
-  return command_interfaces;
 }
 
 void NlaHardwareInterface::receive_loop()
@@ -186,15 +144,20 @@ void NlaHardwareInterface::receive_loop()
 
 return_type NlaHardwareInterface::read(const rclcpp::Time &, const rclcpp::Duration &)
 {
-  RCLCPP_INFO_ONCE(logger_, "Reading motors");
+  RCLCPP_INFO_ONCE(get_logger(), "Reading motors");
   int32_t gpio_states[2] = {0, 0};
+  double joint_position = 0.0;
+  double joint_velocity = 0.0;
 
-  linear_joint_->getJointPos(joint_position_);
-  linear_joint_->getJointVel(joint_velocity_);
+  linear_joint_->getJointPos(joint_position);
+  linear_joint_->getJointVel(joint_velocity);
   linear_joint_->getGpioData(gpio_states[0], gpio_states[1]);
 
-  gpio_states_[0] = static_cast<double>(gpio_states[0]);
-  gpio_states_[1] = static_cast<double>(gpio_states[1]);
+  // Use Jazzy set_state() API with fully qualified interface names
+  set_state(info_.joints[0].name + "/" + hardware_interface::HW_IF_POSITION, joint_position);
+
+  set_state(info_.gpios[0].name + "/dig_in_1", static_cast<double>(gpio_states[0]));
+  set_state(info_.gpios[0].name + "/dig_in_2", static_cast<double>(gpio_states[1]));
 
   rclcpp::spin_some(helperNode_); //for reading emstop
 
@@ -204,35 +167,39 @@ return_type NlaHardwareInterface::read(const rclcpp::Time &, const rclcpp::Durat
 return_type NlaHardwareInterface::write(const rclcpp::Time &, const rclcpp::Duration &)
 {
 
-  RCLCPP_INFO_ONCE(logger_, "writing motors");
- 
+  RCLCPP_INFO_ONCE(get_logger(), "writing motors");
+  // Get the velocity command using the Jazzy get_command() API
+  const std::string vel_cmd_name = info_.joints[0].name + "/" + hardware_interface::HW_IF_VELOCITY;
+  double joint_velocity_commands = get_command(vel_cmd_name);
+
   if (emstop_) {
     // ToDo: Add logging time has parameter
-    RCLCPP_INFO_THROTTLE(logger_, clock_, 6000.0,
+    RCLCPP_INFO_THROTTLE(get_logger(), clock_, 6000.0,
       "linear_axis is in EMSTOP");
     linear_joint_->stopMotion();
   } else {
     // Joint velocities are set only after homing is done
     if (linear_joint_->inSafetyRegion()) {
-      RCLCPP_INFO_THROTTLE(logger_, clock_, 100000.0,
+      RCLCPP_INFO_THROTTLE(get_logger(), clock_, 100000.0,
         "Linear axis is active");
-      if (abs(joint_velocity_commands_) > 0) {
+      if (abs(joint_velocity_commands) > 0) {
         /** Currently, JTC holds position while cancelling the goal. 
          * This eventually holds the velocity as well, causing the axis not to stop.
          * Below is the solution for holding the goal. 
          * It will be further researched
          * https://github.com/neobotix/neo_linear_axis/issues/9
         **/
-        if (abs(last_velocity_command - joint_velocity_commands_) > 1e-9 )
+        static double last_velocity_command = 0.0;
+        if (abs(last_velocity_command - joint_velocity_commands) > 1e-9 )
         {
-          linear_joint_->setJointVel(joint_velocity_commands_);
+          linear_joint_->setJointVel(joint_velocity_commands);
         } else {
           linear_joint_->stopMotion();
         }
+        last_velocity_command = joint_velocity_commands;
       }
     }
   }
-  last_velocity_command = joint_velocity_commands_;
   // Send commands to motor commands
   linear_joint_->updateMotor();
 
