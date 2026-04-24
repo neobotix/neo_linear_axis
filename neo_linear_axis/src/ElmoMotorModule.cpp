@@ -254,7 +254,7 @@ void ElmoMotorModule::startHoming()
 
   /** choosing channel/switch on which controller has to 
    listen for change of homing event(high/low/falling/rising) **/
-  canopen_set_int('H', 'M', 3, HomeDigIn_);
+  canopen_set_int('H', 'M', 3, 5);
   canSync();
 
   // choose the action that the controller shall perform after the homing event occurred
@@ -294,7 +294,7 @@ void ElmoMotorModule::armHoming()
 void ElmoMotorModule::motorSetVel(double & linVelms)
 {
   const double motor_vel_rev_s = motor_.gear_ratio * linVelms / motor_.meters_per_revolution;
-  const int32_t motor_vel_inc_s = static_cast<int>(motor_vel_rev_s * motor_.enc_ticks_per_rev);
+  const int32_t motor_vel_inc_s = static_cast<int>(motor_vel_rev_s * motor_.enc_ticks_per_rev) * motor_.rot_sign;
 
   const int32_t lim_motor_vel_inc_s = std::min(
     std::max(
@@ -308,7 +308,7 @@ void ElmoMotorModule::motorSetVel(double & linVelms)
 void ElmoMotorModule::motorSetPos(double & jointPos)
 {
   const double motor_pos_rev = motor_.gear_ratio * jointPos / motor_.meters_per_revolution;
-  int32_t motor_pos_inc = static_cast<int>(motor_pos_rev * motor_.enc_ticks_per_rev);
+  int32_t motor_pos_inc = static_cast<int>(motor_pos_rev * motor_.enc_ticks_per_rev) * motor_.rot_sign;
 
   canopen_set_int('P', 'A', 0,  motor_pos_inc);
 }
@@ -755,13 +755,13 @@ void ElmoMotorModule::handlePDO2(const can_msg_t & msg)
 
 double ElmoMotorModule::currPose()
 {
-  return static_cast<double>(motor_.meters_per_revolution * motor_.curr_enc_pos_inc) /
+  return static_cast<double>(motor_.meters_per_revolution * motor_.curr_enc_pos_inc * motor_.rot_sign) /
          motor_.enc_ticks_per_rev / motor_.gear_ratio;
 }
 
 double ElmoMotorModule::currVel()
 {
-  return static_cast<double>(motor_.meters_per_revolution * motor_.curr_enc_vel_inc_s) /
+  return static_cast<double>(motor_.meters_per_revolution * motor_.curr_enc_vel_inc_s * motor_.rot_sign) /
          motor_.enc_ticks_per_rev / motor_.gear_ratio;
 }
 

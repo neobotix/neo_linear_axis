@@ -2,6 +2,8 @@
 #define NEO_LINEAR_AXIS__NLA_HARDWARE_INTERFACE_HPP_
 
 #include "hardware_interface/system_interface.hpp"
+#include "hardware_interface/hardware_info.hpp"
+#include "hardware_interface/types/hardware_interface_type_values.hpp"
 
 #include "neo_linear_axis/motor.hpp"
 #include "neo_linear_axis/neo_linear_joint.hpp"
@@ -31,7 +33,7 @@ public:
 private:
   double timeout_ = 0.2;
   double homeVel_ = -0.03;
-  int homeDigIn_ = 7;
+  int homeDigIn_ = 5;
   double control_rate_ = 100.0;
   double init_pos_ = 0.1;
 

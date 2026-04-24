@@ -39,7 +39,7 @@ struct motor_t
 {
   std::string joint_name;         // ROS joint name
   int32_t node_id = 127;          // motor "CAN ID"
-  int32_t rot_sign = 0;         // motor rotation direction
+  int32_t rot_sign = -1;         // motor rotation direction
   int32_t enc_ticks_per_rev = 10000;      // encoder ticks per motor revolution
   int32_t enc_home_offset = 0;      // encoder offset for true home position
   int32_t max_vel_enc_s = 500000;     // max motor velocity in ticks/s (positive)

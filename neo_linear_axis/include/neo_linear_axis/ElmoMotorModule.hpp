@@ -113,7 +113,7 @@ private:
   bool isHoming_ = false;
   bool isStopped_ = true;
   bool sockStatus_ = false;
-  int HomeDigIn_;
+  int32_t HomeDigIn_;
   rclcpp::Time last_sync_time_;
 
   volatile bool doRun_ = true;

@@ -248,7 +248,6 @@ void NeoLinearJoint::updateMotor()
           motorOp_->beginMotion();
           command_sent = true;
       }
-
       if (abs(currPose_ - init_pos_) <= 0.001) {
         safety_shift_ = true;
         motorOp_->motorOff();
