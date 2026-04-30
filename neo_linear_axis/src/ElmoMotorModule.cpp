@@ -236,7 +236,7 @@ void ElmoMotorModule::startHoming()
     return;
   }
 
-  if (dig_ins_[1] == 1) {
+  if (dig_ins_[0] == 1) {
     RCLCPP_INFO(logger_, "Linear axis already in the home position");
     finishHoming();
     return;
@@ -412,7 +412,7 @@ bool ElmoMotorModule::checkHomingDone()
     motor_.homing_state = 2;
   }
 
-  if (dig_ins_[1] == 1) {
+  if (dig_ins_[0] == 1) {
     RCLCPP_INFO(logger_, "Linear axis reached the home position");
     finishHoming();
     stopMotion();

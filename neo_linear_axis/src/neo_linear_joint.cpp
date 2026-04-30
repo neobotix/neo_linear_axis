@@ -67,6 +67,7 @@ void NeoLinearJoint::initMotor()
   motorOp_->configurePDOMapping();
   motorOp_->requestMotorStatus();
   motorOp_->readIOs();
+  motorOp_->motorOn();
   RCLCPP_INFO(logger_, "Initializing done");
 
 }

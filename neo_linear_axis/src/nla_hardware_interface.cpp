@@ -98,7 +98,7 @@ CallbackReturn NlaHardwareInterface::on_configure(const rclcpp_lifecycle::State 
 {
   if (!linear_joint_->isSocketOpened()) {
     // Comms initialization
-    bool socketError;
+    bool socketError = false;
     linear_joint_->openSocket();
     linear_joint_->checkSocketError(socketError);
     linear_joint_->setEMState(emstop_);
@@ -106,6 +106,9 @@ CallbackReturn NlaHardwareInterface::on_configure(const rclcpp_lifecycle::State 
       return CallbackReturn::ERROR;
     }
     linear_joint_->initComms();
+    // adding a sleep
+    rclcpp::Rate loop_rate(10); // 10Hz
+    loop_rate.sleep();
   }
 
   return CallbackReturn::SUCCESS; 
