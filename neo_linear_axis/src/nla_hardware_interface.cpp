@@ -98,7 +98,7 @@ CallbackReturn NlaHardwareInterface::on_configure(const rclcpp_lifecycle::State 
 {
   if (!linear_joint_->isSocketOpened()) {
     // Comms initialization
-    bool socketError;
+    bool socketError = false;
     linear_joint_->openSocket();
     linear_joint_->checkSocketError(socketError);
     linear_joint_->setEMState(emstop_);
@@ -106,7 +106,11 @@ CallbackReturn NlaHardwareInterface::on_configure(const rclcpp_lifecycle::State 
       return CallbackReturn::ERROR;
     }
     linear_joint_->initComms();
+    // adding a sleep
+    rclcpp::Rate loop_rate(10); // 10Hz
+    loop_rate.sleep();
   }
+
   return CallbackReturn::SUCCESS; 
 }
 
@@ -144,7 +148,6 @@ void NlaHardwareInterface::receive_loop()
 
 return_type NlaHardwareInterface::read(const rclcpp::Time &, const rclcpp::Duration &)
 {
-  RCLCPP_INFO_ONCE(get_logger(), "Reading motors");
   int32_t gpio_states[2] = {0, 0};
   double joint_position = 0.0;
   double joint_velocity = 0.0;
@@ -166,22 +169,15 @@ return_type NlaHardwareInterface::read(const rclcpp::Time &, const rclcpp::Durat
 
 return_type NlaHardwareInterface::write(const rclcpp::Time &, const rclcpp::Duration &)
 {
-
-  RCLCPP_INFO_ONCE(get_logger(), "writing motors");
   // Get the velocity command using the Jazzy get_command() API
   const std::string vel_cmd_name = info_.joints[0].name + "/" + hardware_interface::HW_IF_VELOCITY;
   double joint_velocity_commands = get_command(vel_cmd_name);
 
   if (emstop_) {
-    // ToDo: Add logging time has parameter
-    RCLCPP_INFO_THROTTLE(get_logger(), clock_, 6000.0,
-      "linear_axis is in EMSTOP");
     linear_joint_->stopMotion();
   } else {
     // Joint velocities are set only after homing is done
     if (linear_joint_->inSafetyRegion()) {
-      RCLCPP_INFO_THROTTLE(get_logger(), clock_, 100000.0,
-        "Linear axis is active");
       if (abs(joint_velocity_commands) > 0) {
         /** Currently, JTC holds position while cancelling the goal. 
          * This eventually holds the velocity as well, causing the axis not to stop.
