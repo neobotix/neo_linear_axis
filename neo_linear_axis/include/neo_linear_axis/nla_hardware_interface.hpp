@@ -1,5 +1,32 @@
+/*********************************************************************
+MIT License
+
+Copyright (c) 2023 neobotix gmbh
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+ *********************************************************************/
+
 #ifndef NEO_LINEAR_AXIS__NLA_HARDWARE_INTERFACE_HPP_
 #define NEO_LINEAR_AXIS__NLA_HARDWARE_INTERFACE_HPP_
+
+#include <memory>
+#include <string>
 
 #include "hardware_interface/system_interface.hpp"
 #include "hardware_interface/hardware_info.hpp"
@@ -13,12 +40,14 @@
 using hardware_interface::CallbackReturn;
 using hardware_interface::return_type;
 
-namespace nla {
+namespace nla
+{
 
 class NlaHardwareInterface : public hardware_interface::SystemInterface
 {
 public:
-  CallbackReturn on_init(const hardware_interface::HardwareComponentInterfaceParams & params) override;
+  CallbackReturn on_init(
+    const hardware_interface::HardwareComponentInterfaceParams & params) override;
   CallbackReturn on_configure(const rclcpp_lifecycle::State & /*info*/) override;
   CallbackReturn on_activate(const rclcpp_lifecycle::State & /*info*/) override;
   CallbackReturn on_deactivate(const rclcpp_lifecycle::State & /*info*/) override;
@@ -53,10 +82,9 @@ private:
   rclcpp::Subscription<neo_msgs2::msg::EmergencyStopState>::SharedPtr sub_emergency_stop_;
   void emergency_stop_callback(const neo_msgs2::msg::EmergencyStopState::SharedPtr state);
 
-// Check for other functions that needs to be included and overrided. 
+// Check for other functions that needs to be included and overrided.
 };
 
-}
+}  // namespace nla
 
-
-#endif // NEO_LINEAR_AXIS__NLA_HARDWARE_INTERFACE_HPP_
+#endif  // NEO_LINEAR_AXIS__NLA_HARDWARE_INTERFACE_HPP_

@@ -28,7 +28,7 @@ SOFTWARE.
 using std::placeholders::_1;
 
 ElmoMotorModule::ElmoMotorModule(motor_t motor, rclcpp::Logger logger)
-  :motor_(motor), logger_(logger)
+:motor_(motor), logger_(logger)
 {
   // configuring CAN for the motor transmission
   motor_.can_Tx_PDO1 = motor_.node_id + 0x180;
@@ -127,7 +127,6 @@ void ElmoMotorModule::transmitCan(const can_msg_t & msg)
     const auto res = ::write(canSock_, &out, sizeof(out));
     if (res < 0) {
       throw std::runtime_error("write() failed with: " + std::string(strerror(errno)));
-      
     }
     if (res != sizeof(out)) {
       // re-open socket
@@ -144,7 +143,8 @@ void ElmoMotorModule::setCanIface(std::string & canIface)
 
 void ElmoMotorModule::setMotorModulo()
 {
-  int32_t ticks_per_rev =  static_cast<int>(motor_.enc_ticks_per_rev * motor_.gear_ratio / motor_.meters_per_revolution);
+  int32_t ticks_per_rev = static_cast<int>(motor_.enc_ticks_per_rev * motor_.gear_ratio /
+    motor_.meters_per_revolution);
   canopen_set_int('X', 'M', 1, -1 * ticks_per_rev);
   canopen_set_int('X', 'M', 2, ticks_per_rev);
 
@@ -232,7 +232,7 @@ void ElmoMotorModule::setIsHoming(bool isHoming)
 
 void ElmoMotorModule::startHoming()
 {
-  if (isHoming_ ) {
+  if (isHoming_) {
     return;
   }
 
@@ -252,9 +252,9 @@ void ElmoMotorModule::startHoming()
   canopen_set_int('H', 'M', 2, -motor_.enc_home_offset);
   canSync();
 
-  /** choosing channel/switch on which controller has to 
+  /** choosing channel/switch on which controller has to
    listen for change of homing event(high/low/falling/rising) **/
-  canopen_set_int('H', 'M', 3, 5);
+  canopen_set_int('H', 'M', 3, HomeDigIn_);
   canSync();
 
   // choose the action that the controller shall perform after the homing event occurred
@@ -294,7 +294,8 @@ void ElmoMotorModule::armHoming()
 void ElmoMotorModule::motorSetVel(double & linVelms)
 {
   const double motor_vel_rev_s = motor_.gear_ratio * linVelms / motor_.meters_per_revolution;
-  const int32_t motor_vel_inc_s = static_cast<int>(motor_vel_rev_s * motor_.enc_ticks_per_rev) * motor_.rot_sign;
+  const int32_t motor_vel_inc_s = static_cast<int>(motor_vel_rev_s * motor_.enc_ticks_per_rev) *
+    motor_.rot_sign;
 
   const int32_t lim_motor_vel_inc_s = std::min(
     std::max(
@@ -308,9 +309,10 @@ void ElmoMotorModule::motorSetVel(double & linVelms)
 void ElmoMotorModule::motorSetPos(double & jointPos)
 {
   const double motor_pos_rev = motor_.gear_ratio * jointPos / motor_.meters_per_revolution;
-  int32_t motor_pos_inc = static_cast<int>(motor_pos_rev * motor_.enc_ticks_per_rev) * motor_.rot_sign;
+  int32_t motor_pos_inc = static_cast<int>(motor_pos_rev * motor_.enc_ticks_per_rev) *
+    motor_.rot_sign;
 
-  canopen_set_int('P', 'A', 0,  motor_pos_inc);
+  canopen_set_int('P', 'A', 0, motor_pos_inc);
 }
 
 void ElmoMotorModule::setHomeDigIn(int & HomeDigIn)
@@ -467,19 +469,19 @@ bool ElmoMotorModule::isOperational()
 
 void ElmoMotorModule::resetPosCounter()
 {
-  canopen_set_int('P','X', 0, 0);
+  canopen_set_int('P', 'X', 0, 0);
   canSync();
 }
 
 void ElmoMotorModule::motorOn()
 {
-  canopen_set_int('M','O', 0, 1);
+  canopen_set_int('M', 'O', 0, 1);
   canSync();
 }
 
 void ElmoMotorModule::motorOff()
 {
-  canopen_set_int('M','O', 0, 0);
+  canopen_set_int('M', 'O', 0, 0);
   canSync();
 }
 
@@ -563,7 +565,7 @@ void ElmoMotorModule::openSocket()
 {
   if (!isError_ || canSock_ < 0) {
     if (canSock_ >= 0) {
-      ::close(canSock_); // close first
+      ::close(canSock_);  // close first
     }
     try {
       // Open Socket
@@ -583,7 +585,7 @@ void ElmoMotorModule::openSocket()
       ::sockaddr_can addr = {};
       addr.can_family = AF_CAN;
       addr.can_ifindex = ifr.ifr_ifindex;
-      
+
       if (::bind(canSock_, (::sockaddr *)(&addr), sizeof(addr)) < 0) {
         throw std::runtime_error("bind() failed!");
       }
@@ -594,7 +596,7 @@ void ElmoMotorModule::openSocket()
       isError_ = false;
     } catch (const std::exception & ex) {
       RCLCPP_WARN_STREAM(
-        logger_, "Failed to open CAN interface '" << canIface_ << "': "
+        logger_, "Failed to open CAN interface '"            << canIface_ << "': "
                                                              << ex.what() << " (" <<
           ::strerror(errno) << ")");
       isError_ = true;
@@ -617,7 +619,6 @@ void ElmoMotorModule::readIOs()
 
 void ElmoMotorModule::readMotor()
 {
-  
   // close socket if error
   if (isError_) {
     ::close(canSock_);
@@ -671,7 +672,6 @@ void ElmoMotorModule::shutdown()
     }
     can_condtion_.notify_all();     // notify that socket is closed
   }
-
 }
 
 void ElmoMotorModule::handle(const can_msg_t & msg)
@@ -686,7 +686,6 @@ void ElmoMotorModule::handle(const can_msg_t & msg)
   if ( (motor_.update_recv_time > last_sync_time_) ) {
     curr_pos_ = currPose();
   }
-  
 }
 
 void ElmoMotorModule::setSyncTime(rclcpp::Time last_sync_time)
@@ -727,7 +726,6 @@ void ElmoMotorModule::handlePDO2(const can_msg_t & msg)
   }
   if (msg.data[0] == 'H' && msg.data[1] == 'M') {
     if (msg.data[4] == 0) {      // check if motor says homing finished
-
       if (motor_.homing_state == 0) {
         if (((clock_.now() - motor_.homing_start_time).nanoseconds() * 1.0 /
           1000000000.0) > 0.5)
@@ -746,7 +744,7 @@ void ElmoMotorModule::handlePDO2(const can_msg_t & msg)
   if (msg.data[0] == 'I' && msg.data[1] == 'B') {
     auto data = read_int32(msg, 4);
     if (msg.data[2] == 10) {
-      dig_ins_[0] = data; 
+      dig_ins_[0] = data;
     } else if (msg.data[2] == 11) {
       dig_ins_[1] = data;
     }
@@ -755,13 +753,15 @@ void ElmoMotorModule::handlePDO2(const can_msg_t & msg)
 
 double ElmoMotorModule::currPose()
 {
-  return static_cast<double>(motor_.meters_per_revolution * motor_.curr_enc_pos_inc * motor_.rot_sign) /
+  return static_cast<double>(motor_.meters_per_revolution * motor_.curr_enc_pos_inc *
+         motor_.rot_sign) /
          motor_.enc_ticks_per_rev / motor_.gear_ratio;
 }
 
 double ElmoMotorModule::currVel()
 {
-  return static_cast<double>(motor_.meters_per_revolution * motor_.curr_enc_vel_inc_s * motor_.rot_sign) /
+  return static_cast<double>(motor_.meters_per_revolution * motor_.curr_enc_vel_inc_s *
+         motor_.rot_sign) /
          motor_.enc_ticks_per_rev / motor_.gear_ratio;
 }
 

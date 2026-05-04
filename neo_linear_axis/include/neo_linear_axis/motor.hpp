@@ -25,6 +25,8 @@ SOFTWARE.
 #ifndef NEO_LINEAR_AXIS__MOTOR_HPP_
 #define NEO_LINEAR_AXIS__MOTOR_HPP_
 
+#include <string>
+
 #include "rclcpp/rclcpp.hpp"
 
 enum motor_state_e
@@ -73,4 +75,4 @@ struct motor_t
   int homing_state = -1;
 };
 
-#endif // NEO_LINEAR_AXIS__MOTOR_HPP_
+#endif  // NEO_LINEAR_AXIS__MOTOR_HPP_

@@ -22,8 +22,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
  *********************************************************************/
 
-#include <neo_linear_axis/can_msg.hpp>
-#include <neo_linear_axis/motor.hpp>
 #include <linux/can.h>
 #include <linux/can/raw.h>
 #include <net/if.h>
@@ -31,8 +29,13 @@ SOFTWARE.
 #include <sys/socket.h>
 #include <sys/types.h>
 
-#ifndef NEO_LINEAR_AXIS__ELMO_MOTOR_MODULE_HPP_
-#define NEO_LINEAR_AXIS__ELMO_MOTOR_MODULE_HPP_
+#include <string>
+
+#include <neo_linear_axis/can_msg.hpp>
+#include <neo_linear_axis/motor.hpp>
+
+#ifndef NEO_LINEAR_AXIS__ELMOMOTORMODULE_HPP_
+#define NEO_LINEAR_AXIS__ELMOMOTORMODULE_HPP_
 
 class ElmoMotorModule
 {
@@ -113,7 +116,7 @@ private:
   bool isHoming_ = false;
   bool isStopped_ = true;
   bool sockStatus_ = false;
-  int32_t HomeDigIn_;
+  int HomeDigIn_ = 5;
   rclcpp::Time last_sync_time_;
 
   volatile bool doRun_ = true;
@@ -131,9 +134,9 @@ private:
 
   bool isError_ = false;
   std::string canIface_;
-  bool shutdown_=false;
+  bool shutdown_ = false;
 
   rclcpp::Logger logger_;
   rclcpp::Time last_update_time_;
 };
-#endif // NEO_LINEAR_AXIS__ELMO_MOTOR_MODULE_HPP_
+#endif  // NEO_LINEAR_AXIS__ELMOMOTORMODULE_HPP_

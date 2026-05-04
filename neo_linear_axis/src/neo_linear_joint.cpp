@@ -29,12 +29,13 @@ SOFTWARE.
 using std::placeholders::_1;
 
 NeoLinearJoint::NeoLinearJoint(motor_t motor, rclcpp::Logger Logger)
-  :motor_(motor), logger_(Logger)
+:motor_(motor), logger_(Logger)
 {
   motorOp_ = std::make_shared<ElmoMotorModule>(motor_, Logger);
 }
 
-NeoLinearJoint::~NeoLinearJoint(){
+NeoLinearJoint::~NeoLinearJoint()
+{
 }
 
 void NeoLinearJoint::initComms()
@@ -56,20 +57,18 @@ void NeoLinearJoint::setCommonMotorParams(
 
 void NeoLinearJoint::initMotor()
 {
-
   motorOp_->motorOff();
   motorOp_->stopMotion();
 
   // Disable watchdog
   motorOp_->setMotorModulo();
-  motorOp_->enablePosMode(); // Just for Homing
+  motorOp_->enablePosMode();  // Just for Homing
   motorOp_->resetPosCounter();
   motorOp_->configurePDOMapping();
   motorOp_->requestMotorStatus();
   motorOp_->readIOs();
   motorOp_->motorOn();
   RCLCPP_INFO(logger_, "Initializing done");
-
 }
 
 void NeoLinearJoint::setCanIface(std::string & canIface)
@@ -101,7 +100,7 @@ void NeoLinearJoint::setHomeDigIn(int & digIn)
 
 bool NeoLinearJoint::isSocketOpened()
 {
- return motorOp_->isSocketOpened();
+  return motorOp_->isSocketOpened();
 }
 
 void NeoLinearJoint::openSocket()
@@ -116,7 +115,7 @@ void NeoLinearJoint::checkSocketError(bool & isError)
 
 void NeoLinearJoint::readMotor()
 {
-  motorOp_->readMotor();  
+  motorOp_->readMotor();
 }
 
 void NeoLinearJoint::getGpioData(
@@ -164,7 +163,7 @@ void NeoLinearJoint::setJointPos(double & joint_position)
 
 bool NeoLinearJoint::inSafetyRegion()
 {
-  if (safety_shift_){
+  if (safety_shift_) {
     return true;
   }
   return false;
@@ -203,8 +202,9 @@ void NeoLinearJoint::updateMotor()
 
   // Check if motor is operational
 
-  if (motorOp_->isReset()
-    && motorOp_->isOperational()) {
+  if (motorOp_->isReset() &&
+    motorOp_->isOperational())
+  {
     motor_ready_ = true;
     motorOp_->motorOff();
     motorOp_->sendSyncMsg();
@@ -242,12 +242,13 @@ void NeoLinearJoint::updateMotor()
   if (motor_ready_) {
     if (!safety_shift_ &&
       motor_on_ &&
-      motorOp_->isOperational()) {
+      motorOp_->isOperational())
+    {
       if (!command_sent) {
-          RCLCPP_INFO(logger_, "sending to safety region");
-          motorOp_->motorSetPos(init_pos_);
-          motorOp_->beginMotion();
-          command_sent = true;
+        RCLCPP_INFO(logger_, "sending to safety region");
+        motorOp_->motorSetPos(init_pos_);
+        motorOp_->beginMotion();
+        command_sent = true;
       }
       if (abs(currPose_ - init_pos_) <= 0.001) {
         safety_shift_ = true;
@@ -259,9 +260,9 @@ void NeoLinearJoint::updateMotor()
 
     if (safety_shift_) {
       if (motorOp_->isOperational()) {
-          motorOp_->motorSetVel(linearVel_);
-          motorOp_->beginMotion();
-      }      
+        motorOp_->motorSetVel(linearVel_);
+        motorOp_->beginMotion();
+      }
     }
 
     syncCounter_++;
@@ -271,18 +272,18 @@ void NeoLinearJoint::updateMotor()
     motorOp_->setSyncTime(last_sync_time_);
 
     if (!safety_shift_ && !motorOp_->isOperational()) {
-        motorOp_->motorOn();
-        motor_on_ = true;
-      }
+      motorOp_->motorOn();
+      motor_on_ = true;
+    }
 
     // Status request checker
     if (syncCounter_ % statusdivider_ == 0) {
-          motorOp_->requestMotorStatus();    // request status update
+      motorOp_->requestMotorStatus();        // request status update
     }
 
     if ((syncCounter_ + 1) % heartbeatdivider_ == 0) {
-      motorOp_->sendHeartBeat(); // Heartbeat of master to slave
+      motorOp_->sendHeartBeat();  // Heartbeat of master to slave
       motorOp_->readIOs();
     }
-  }  
+  }
 }

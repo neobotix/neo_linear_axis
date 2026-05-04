@@ -26,10 +26,10 @@ SOFTWARE.
 #define NEO_LINEAR_AXIS__CAN_MSG_HPP_
 
 struct can_msg_t
-  {
-    int id = -1;
-    int length = 0;
-    uint8_t data[8] = {};
-  };
+{
+  int id = -1;
+  int length = 0;
+  uint8_t data[8] = {};
+};
 
-#endif // NEO_LINEAR_AXIS__CAN_MSG_HPP_
+#endif  // NEO_LINEAR_AXIS__CAN_MSG_HPP_
