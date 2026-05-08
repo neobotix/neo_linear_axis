@@ -170,6 +170,7 @@ return_type NlaHardwareInterface::read(const rclcpp::Time &, const rclcpp::Durat
 
   // Use Jazzy set_state() API with fully qualified interface names
   set_state(info_.joints[0].name + "/" + hardware_interface::HW_IF_POSITION, joint_position);
+  set_state(info_.joints[0].name + "/" + hardware_interface::HW_IF_VELOCITY, joint_velocity);
 
   set_state(info_.gpios[0].name + "/dig_in_1", static_cast<double>(gpio_states[0]));
   set_state(info_.gpios[0].name + "/dig_in_2", static_cast<double>(gpio_states[1]));
@@ -191,19 +192,7 @@ return_type NlaHardwareInterface::write(const rclcpp::Time &, const rclcpp::Dura
     // Joint velocities are set only after homing is done
     if (linear_joint_->inSafetyRegion()) {
       if (abs(joint_velocity_commands) > 0) {
-        /** Currently, JTC holds position while cancelling the goal.
-         * This eventually holds the velocity as well, causing the axis not to stop.
-         * Below is the solution for holding the goal.
-         * It will be further researched
-         * https://github.com/neobotix/neo_linear_axis/issues/9
-        **/
-        static double last_velocity_command = 0.0;
-        if (abs(last_velocity_command - joint_velocity_commands) > 1e-9) {
-          linear_joint_->setJointVel(joint_velocity_commands);
-        } else {
-          linear_joint_->stopMotion();
-        }
-        last_velocity_command = joint_velocity_commands;
+        linear_joint_->setJointVel(joint_velocity_commands);
       }
     }
   }

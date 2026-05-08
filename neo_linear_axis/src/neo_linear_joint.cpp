@@ -181,10 +181,10 @@ void NeoLinearJoint::setInitPos(double & init_pos)
 void NeoLinearJoint::setJointVel(double & joint_velocity)
 {
   linearVel_ = joint_velocity;
-  if (abs(linearVel_) >= 0.005 && !motorOp_->isOperational()) {
+  if (abs(linearVel_) >= 0.006 && !motorOp_->isOperational()) {
     motorOp_->motorOn();
   }
-  if (abs(linearVel_) < 0.005 && motorOp_->isOperational()) {
+  if (abs(linearVel_) < 0.006 && motorOp_->isOperational()) {
     motorOp_->motorOff();
   }
 }
