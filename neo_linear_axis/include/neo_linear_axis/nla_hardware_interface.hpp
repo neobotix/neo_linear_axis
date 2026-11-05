@@ -25,8 +25,10 @@ SOFTWARE.
 #ifndef NEO_LINEAR_AXIS__NLA_HARDWARE_INTERFACE_HPP_
 #define NEO_LINEAR_AXIS__NLA_HARDWARE_INTERFACE_HPP_
 
+#include <atomic>
 #include <memory>
 #include <string>
+#include <thread>
 
 #include "hardware_interface/system_interface.hpp"
 #include "hardware_interface/hardware_info.hpp"
@@ -60,6 +62,8 @@ public:
   void receive_loop();
 
 private:
+  void stop_receive_thread();
+
   double timeout_ = 0.2;
   double homeVel_ = -0.03;
   int homeDigIn_ = 5;
@@ -71,6 +75,7 @@ private:
   std::string canIface_ = "can0";
   std::mutex node_mutex_;
   std::thread read_thread_;
+  std::atomic<bool> receive_running_{false};
 
   rclcpp::Clock clock_;
   rclcpp::Node::SharedPtr helperNode_;

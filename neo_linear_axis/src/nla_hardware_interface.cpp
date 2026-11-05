@@ -44,7 +44,14 @@ NlaHardwareInterface::NlaHardwareInterface()
 NlaHardwareInterface::~NlaHardwareInterface()
 {
   RCLCPP_INFO(get_logger(), "Shutting down");
-  linear_joint_->shutdown();
+  stop_receive_thread();
+  if (linear_joint_) {
+    try {
+      linear_joint_->shutdown();
+    } catch (const std::exception & ex) {
+      RCLCPP_ERROR(get_logger(), "Shutdown failed: %s", ex.what());
+    }
+  }
 }
 
 CallbackReturn NlaHardwareInterface::on_init(
@@ -109,6 +116,13 @@ CallbackReturn NlaHardwareInterface::on_init(
 
 CallbackReturn NlaHardwareInterface::on_configure(const rclcpp_lifecycle::State & /*info*/)
 {
+  return CallbackReturn::SUCCESS;
+}
+
+CallbackReturn NlaHardwareInterface::on_activate(const rclcpp_lifecycle::State &)
+{
+  set_command(info_.joints[0].name + "/" + hardware_interface::HW_IF_VELOCITY, 0.0);
+
   if (!linear_joint_->isSocketOpened()) {
     // Comms initialization
     bool socketError = false;
@@ -124,14 +138,10 @@ CallbackReturn NlaHardwareInterface::on_configure(const rclcpp_lifecycle::State 
     loop_rate.sleep();
   }
 
-  return CallbackReturn::SUCCESS;
-}
-
-CallbackReturn NlaHardwareInterface::on_activate(const rclcpp_lifecycle::State &)
-{
   // Starting the motors
   RCLCPP_INFO(get_logger(), "Initializing motors");
   linear_joint_->initMotor();
+  receive_running_ = true;
   read_thread_ = std::thread(&NlaHardwareInterface::receive_loop, this);
   return CallbackReturn::SUCCESS;
 }
@@ -139,6 +149,8 @@ CallbackReturn NlaHardwareInterface::on_activate(const rclcpp_lifecycle::State &
 CallbackReturn NlaHardwareInterface::on_deactivate(const rclcpp_lifecycle::State & /*info*/)
 {
   RCLCPP_INFO(get_logger(), "Shutting down");
+  linear_joint_->stopMotion();
+  stop_receive_thread();
   linear_joint_->shutdown();
   return CallbackReturn::SUCCESS;
 }
@@ -146,14 +158,30 @@ CallbackReturn NlaHardwareInterface::on_deactivate(const rclcpp_lifecycle::State
 CallbackReturn NlaHardwareInterface::on_error(const rclcpp_lifecycle::State & /*info*/)
 {
   RCLCPP_INFO(get_logger(), "Error received, stopping the motor");
-  linear_joint_->stopMotion();
+  stop_receive_thread();
+  if (linear_joint_ && linear_joint_->isSocketOpened()) {
+    try {
+      linear_joint_->stopMotion();
+    } catch (const std::exception & ex) {
+      RCLCPP_ERROR(get_logger(), "Failed to stop motor: %s", ex.what());
+      return CallbackReturn::ERROR;
+    }
+  }
   return CallbackReturn::SUCCESS;
+}
+
+void NlaHardwareInterface::stop_receive_thread()
+{
+  receive_running_ = false;
+  if (read_thread_.joinable()) {
+    read_thread_.join();
+  }
 }
 
 void NlaHardwareInterface::receive_loop()
 {
   // Send request for reading the motor data
-  while(rclcpp::ok()) {
+  while (receive_running_ && rclcpp::ok()) {
     linear_joint_->readMotor();
   }
 }
@@ -184,6 +212,11 @@ return_type NlaHardwareInterface::write(const rclcpp::Time &, const rclcpp::Dura
 {
   // Get the velocity command using the Jazzy get_command() API
   const std::string vel_cmd_name = info_.joints[0].name + "/" + hardware_interface::HW_IF_VELOCITY;
+  if (!linear_joint_->isSocketOpened()) {
+    set_command(vel_cmd_name, 0.0);
+    return return_type::OK;
+  }
+
   double joint_velocity_commands = get_command(vel_cmd_name);
 
   if (emstop_) {

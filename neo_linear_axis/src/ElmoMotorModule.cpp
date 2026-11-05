@@ -22,6 +22,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
  *********************************************************************/
 
+#include <poll.h>
+
 #include "rclcpp/rclcpp.hpp"
 #include <neo_linear_axis/ElmoMotorModule.hpp>
 
@@ -594,6 +596,7 @@ void ElmoMotorModule::openSocket()
         logger_, "CAN interface '" << canIface_ << "' opened successfully.");
       sockStatus_ = true;
       isError_ = false;
+      shutdown_ = false;
     } catch (const std::exception & ex) {
       RCLCPP_WARN_STREAM(
         logger_, "Failed to open CAN interface '"            << canIface_ << "': "
@@ -628,6 +631,12 @@ void ElmoMotorModule::readMotor()
     can_condtion_.notify_all();
     return;
   }
+  // Periodically return so the receive loop can check its stop flag.
+  pollfd socket_poll = {canSock_, POLLIN, 0};
+  if (::poll(&socket_poll, 1, 100) <= 0) {
+    return;
+  }
+
   // read a frame
   ::can_frame frame = {};
   const auto res = ::read(canSock_, &frame, sizeof(frame));
@@ -659,6 +668,10 @@ void ElmoMotorModule::readMotor()
 
 void ElmoMotorModule::shutdown()
 {
+  if (shutdown_) {
+    return;
+  }
+
   stopMotion();
   motorOff();
 
@@ -670,6 +683,8 @@ void ElmoMotorModule::shutdown()
       RCLCPP_INFO(logger_, "CAN communication is closed");
       canSock_ = -1;
     }
+    sockStatus_ = false;
+    shutdown_ = true;
     can_condtion_.notify_all();     // notify that socket is closed
   }
 }
