@@ -25,8 +25,10 @@ SOFTWARE.
 #ifndef NEO_LINEAR_AXIS__NLA_HARDWARE_INTERFACE_HPP_
 #define NEO_LINEAR_AXIS__NLA_HARDWARE_INTERFACE_HPP_
 
+#include <atomic>
 #include <memory>
 #include <string>
+#include <thread>
 
 #include "hardware_interface/system_interface.hpp"
 #include "hardware_interface/hardware_info.hpp"
@@ -49,8 +51,10 @@ public:
   CallbackReturn on_init(
     const hardware_interface::HardwareComponentInterfaceParams & params) override;
   CallbackReturn on_configure(const rclcpp_lifecycle::State & /*info*/) override;
+  CallbackReturn on_cleanup(const rclcpp_lifecycle::State & /*info*/) override;
   CallbackReturn on_activate(const rclcpp_lifecycle::State & /*info*/) override;
   CallbackReturn on_deactivate(const rclcpp_lifecycle::State & /*info*/) override;
+  CallbackReturn on_shutdown(const rclcpp_lifecycle::State & /*info*/) override;
   CallbackReturn on_error(const rclcpp_lifecycle::State & /*info*/) override;
 
   return_type read(const rclcpp::Time &, const rclcpp::Duration &) override;
@@ -60,6 +64,9 @@ public:
   void receive_loop();
 
 private:
+  CallbackReturn configure_communication();
+  CallbackReturn shutdown_hardware();
+
   double timeout_ = 0.2;
   double homeVel_ = -0.03;
   int homeDigIn_ = 5;
@@ -69,8 +76,11 @@ private:
   int heartbeat_divider_ = 5;
   int status_divider_ = 10;
   std::string canIface_ = "can0";
-  std::mutex node_mutex_;
+  std::atomic<bool> receive_running_{false};
   std::thread read_thread_;
+  std::atomic<bool> communication_failed_{false};
+  bool motor_initialized_ = false;
+  bool active_ = false;
 
   rclcpp::Clock clock_;
   rclcpp::Node::SharedPtr helperNode_;

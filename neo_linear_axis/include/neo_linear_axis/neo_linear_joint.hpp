@@ -50,6 +50,7 @@ public:
 
   void initComms();
   void initMotor();
+  void motorOn();
 
   void setClock(rclcpp::Clock & clock);
   void setMotorTimeout(double & timeout);

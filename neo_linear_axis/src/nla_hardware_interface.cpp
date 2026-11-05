@@ -22,6 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
  *********************************************************************/
 
+#include <cmath>
 #include <vector>
 
 #include "rclcpp/rclcpp.hpp"
@@ -44,7 +45,7 @@ NlaHardwareInterface::NlaHardwareInterface()
 NlaHardwareInterface::~NlaHardwareInterface()
 {
   RCLCPP_INFO(get_logger(), "Shutting down");
-  linear_joint_->shutdown();
+  shutdown_hardware();
 }
 
 CallbackReturn NlaHardwareInterface::on_init(
@@ -91,7 +92,19 @@ CallbackReturn NlaHardwareInterface::on_init(
     RCLCPP_WARN(get_logger(), "home dig in not specified in the URDF. Defaults to 5");
   }
 
-  // Get all the necessary parameters for the motors
+  if (!std::isfinite(control_rate_) || control_rate_ <= 0.0) {
+    RCLCPP_ERROR(get_logger(), "control_rate must be finite and positive");
+    return CallbackReturn::ERROR;
+  }
+
+  return CallbackReturn::SUCCESS;
+}
+
+CallbackReturn NlaHardwareInterface::on_configure(const rclcpp_lifecycle::State & /*info*/)
+{
+  // A new configuration starts a new session; deactivation keeps this joint intact.
+  motor_initialized_ = false;
+  active_ = false;
   linear_joint_ = std::make_unique<NeoLinearJoint>(motor, get_logger());
   linear_joint_->setInitPos(init_pos_);
   linear_joint_->setClock(clock_);
@@ -104,62 +117,141 @@ CallbackReturn NlaHardwareInterface::on_init(
     status_divider_);  // Setting dummy for now
   linear_joint_->setCanIface(canIface_);  // Setting dummy for now
 
-  return CallbackReturn::SUCCESS;
+  return configure_communication();
 }
 
-CallbackReturn NlaHardwareInterface::on_configure(const rclcpp_lifecycle::State & /*info*/)
+CallbackReturn NlaHardwareInterface::configure_communication()
 {
-  if (!linear_joint_->isSocketOpened()) {
-    // Comms initialization
-    bool socketError = false;
-    linear_joint_->openSocket();
-    linear_joint_->checkSocketError(socketError);
+  try {
+    communication_failed_.store(false);
     linear_joint_->setEMState(emstop_);
-    if (socketError) {
-      return CallbackReturn::ERROR;
+    if (!linear_joint_->isSocketOpened()) {
+      bool socketError = false;
+      linear_joint_->openSocket();
+      linear_joint_->checkSocketError(socketError);
+      if (socketError) {
+        return CallbackReturn::ERROR;
+      }
+      linear_joint_->initComms();
+      rclcpp::Rate loop_rate(10);  // Allow communication initialization to settle.
+      loop_rate.sleep();
     }
-    linear_joint_->initComms();
-    // adding a sleep
-    rclcpp::Rate loop_rate(10);  // 10Hz
-    loop_rate.sleep();
+    // Keep the configured but inactive drive disabled, with heartbeat monitoring suspended.
+    linear_joint_->stopMotion();
+    receive_running_.store(true);
+    read_thread_ = std::thread(&NlaHardwareInterface::receive_loop, this);
+  } catch (const std::exception & ex) {
+    RCLCPP_ERROR(get_logger(), "Failed to initialize CAN communication: %s", ex.what());
+    shutdown_hardware();
+    return CallbackReturn::ERROR;
   }
 
   return CallbackReturn::SUCCESS;
 }
 
+CallbackReturn NlaHardwareInterface::on_cleanup(const rclcpp_lifecycle::State & /*info*/)
+{
+  return shutdown_hardware();
+}
+
 CallbackReturn NlaHardwareInterface::on_activate(const rclcpp_lifecycle::State &)
 {
-  // Starting the motors
-  RCLCPP_INFO(get_logger(), "Initializing motors");
-  linear_joint_->initMotor();
-  read_thread_ = std::thread(&NlaHardwareInterface::receive_loop, this);
+  bool socket_error = false;
+  if (linear_joint_) {
+    linear_joint_->checkSocketError(socket_error);
+  }
+  if (!linear_joint_ || !linear_joint_->isSocketOpened() || socket_error ||
+    communication_failed_.load() || !receive_running_.load())
+  {
+    RCLCPP_ERROR(get_logger(), "CAN communication is unavailable; configure the hardware again");
+    return CallbackReturn::ERROR;
+  }
+
+  try {
+    rclcpp::spin_some(helperNode_);
+    linear_joint_->setEMState(emstop_);
+    set_command(info_.joints[0].name + "/" + hardware_interface::HW_IF_VELOCITY, 0.0);
+    if (!motor_initialized_) {
+      RCLCPP_INFO(get_logger(), "Initializing motor for the first activation");
+      linear_joint_->initMotor();
+      motor_initialized_ = true;
+    } else {
+      RCLCPP_INFO(get_logger(), "Re-enabling motor with its existing home reference");
+      linear_joint_->motorOn();
+    }
+    active_ = true;
+  } catch (const std::exception & ex) {
+    RCLCPP_ERROR(get_logger(), "Failed to activate linear axis: %s", ex.what());
+    shutdown_hardware();
+    return CallbackReturn::ERROR;
+  }
   return CallbackReturn::SUCCESS;
 }
 
 CallbackReturn NlaHardwareInterface::on_deactivate(const rclcpp_lifecycle::State & /*info*/)
 {
-  RCLCPP_INFO(get_logger(), "Shutting down");
-  linear_joint_->shutdown();
+  active_ = false;
+  RCLCPP_INFO(get_logger(), "Stopping and disabling motor; CAN communication remains active");
+  try {
+    set_command(info_.joints[0].name + "/" + hardware_interface::HW_IF_VELOCITY, 0.0);
+    linear_joint_->stopMotion();
+  } catch (const std::exception & ex) {
+    RCLCPP_ERROR(get_logger(), "Failed to deactivate linear axis: %s", ex.what());
+    return CallbackReturn::ERROR;
+  }
   return CallbackReturn::SUCCESS;
+}
+
+CallbackReturn NlaHardwareInterface::on_shutdown(const rclcpp_lifecycle::State & /*info*/)
+{
+  return shutdown_hardware();
 }
 
 CallbackReturn NlaHardwareInterface::on_error(const rclcpp_lifecycle::State & /*info*/)
 {
   RCLCPP_INFO(get_logger(), "Error received, stopping the motor");
-  linear_joint_->stopMotion();
+  return shutdown_hardware();
+}
+
+CallbackReturn NlaHardwareInterface::shutdown_hardware()
+{
+  active_ = false;
+  motor_initialized_ = false;
+  receive_running_.store(false);
+  if (read_thread_.joinable()) {
+    read_thread_.join();
+  }
+  if (linear_joint_) {
+    try {
+      linear_joint_->shutdown();
+    } catch (const std::exception & ex) {
+      RCLCPP_ERROR(get_logger(), "Failed to shut down linear axis: %s", ex.what());
+      return CallbackReturn::ERROR;
+    }
+  }
   return CallbackReturn::SUCCESS;
 }
 
 void NlaHardwareInterface::receive_loop()
 {
   // Send request for reading the motor data
-  while(rclcpp::ok()) {
-    linear_joint_->readMotor();
+  while (receive_running_.load() && rclcpp::ok()) {
+    try {
+      linear_joint_->readMotor();
+    } catch (const std::exception & ex) {
+      RCLCPP_ERROR(get_logger(), "CAN receive failed: %s", ex.what());
+      communication_failed_.store(true);
+      break;
+    }
   }
+  receive_running_.store(false);
 }
 
 return_type NlaHardwareInterface::read(const rclcpp::Time &, const rclcpp::Duration &)
 {
+  if (communication_failed_.load()) {
+    return return_type::ERROR;
+  }
   int32_t gpio_states[2] = {0, 0};
   double joint_position = 0.0;
   double joint_velocity = 0.0;
@@ -182,22 +274,30 @@ return_type NlaHardwareInterface::read(const rclcpp::Time &, const rclcpp::Durat
 
 return_type NlaHardwareInterface::write(const rclcpp::Time &, const rclcpp::Duration &)
 {
-  // Get the velocity command using the Jazzy get_command() API
-  const std::string vel_cmd_name = info_.joints[0].name + "/" + hardware_interface::HW_IF_VELOCITY;
-  double joint_velocity_commands = get_command(vel_cmd_name);
-
-  if (emstop_) {
-    linear_joint_->stopMotion();
-  } else {
-    // Joint velocities are set only after homing is done
-    if (linear_joint_->inSafetyRegion()) {
-      if (abs(joint_velocity_commands) > 0) {
-        linear_joint_->setJointVel(joint_velocity_commands);
-      }
-    }
+  if (communication_failed_.load()) {
+    return return_type::ERROR;
   }
-  // Send commands to motor commands
-  linear_joint_->updateMotor();
+  if (!active_) {
+    return return_type::OK;
+  }
+  try {
+    const std::string vel_cmd_name = info_.joints[0].name + "/" +
+      hardware_interface::HW_IF_VELOCITY;
+    if (emstop_) {
+      set_command(vel_cmd_name, 0.0);
+      linear_joint_->stopMotion();
+      return return_type::OK;
+    }
+    // Pass zero commands too, so an earlier velocity cannot remain in effect.
+    if (linear_joint_->inSafetyRegion()) {
+      double joint_velocity_commands = get_command(vel_cmd_name);
+      linear_joint_->setJointVel(joint_velocity_commands);
+    }
+    linear_joint_->updateMotor();
+  } catch (const std::exception & ex) {
+    RCLCPP_ERROR(get_logger(), "Failed to write linear axis command: %s", ex.what());
+    return return_type::ERROR;
+  }
 
   return return_type::OK;
 }

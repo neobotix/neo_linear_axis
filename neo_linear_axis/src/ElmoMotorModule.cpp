@@ -22,6 +22,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
  *********************************************************************/
 
+#include <poll.h>
+
+#include <exception>
+
 #include "rclcpp/rclcpp.hpp"
 #include <neo_linear_axis/ElmoMotorModule.hpp>
 
@@ -39,10 +43,10 @@ ElmoMotorModule::ElmoMotorModule(motor_t motor, rclcpp::Logger logger)
   last_update_time_ = clock_.now();
 }
 
+ElmoMotorModule::~ElmoMotorModule() = default;
+
 void ElmoMotorModule::initializeNmt()
 {
-  waitForCanSock_ = true;
-
   // start network
   {
     can_msg_t msg;
@@ -110,16 +114,10 @@ void ElmoMotorModule::transmitCan(const can_msg_t & msg)
     out.data[i] = msg.data[i];
   }
 
-  // wait for socket to be ready for writing
-  if (waitForCanSock_) {
-    std::unique_lock<std::mutex> lock(can_mutex_);
-    while (canSock_ < 0) {
-      can_condtion_.wait(lock);
-    }
-  }
-
-  if (shutdown_) {
-    throw std::runtime_error("shutdown");
+  // Serialize heartbeat and motion writes with socket lifetime changes.
+  std::lock_guard<std::mutex> lock(can_mutex_);
+  if (canSock_ < 0 || !sockStatus_ || isError_) {
+    throw std::runtime_error("CAN socket is unavailable");
   }
 
   // send msg
@@ -338,6 +336,10 @@ void ElmoMotorModule::sendHeartBeat()
 
 void ElmoMotorModule::enableWatchdog()
 {
+  if (watchdog_configured_ && watchdog_enabled_) {
+    return;
+  }
+  watchdog_configured_ = false;
   // configure to fail after missing 3 heartbeats
   const int heartbeat_time_ms = 4 * 1000 * heartbeat_divider_ / control_rate_;
   const int pc_node_id = 0x00;
@@ -359,10 +361,21 @@ void ElmoMotorModule::enableWatchdog()
   canOpenSDODownload(0x2F21, 0, 0x08);
 
   canSync();
+  // Start a fresh monitoring interval before the motor is enabled.
+  sendHeartBeat();
+  watchdog_enabled_ = true;
+  watchdog_configured_ = true;
 }
 
 void ElmoMotorModule::disableWatchdog()
 {
+  if (watchdog_configured_ && !watchdog_enabled_) {
+    return;
+  }
+  watchdog_configured_ = false;
+  // A zero consumer time disables heartbeat monitoring while the motor is off.
+  canOpenSDODownload(0x1016, 1, 0);
+
   // Motor action after Hearbeat-Error: No Action
   canOpenSDODownload(0x6007, 0, 0);
 
@@ -375,6 +388,8 @@ void ElmoMotorModule::disableWatchdog()
   canOpenSDODownload(0x2F21, 0, 0x00);
 
   canSync();
+  watchdog_enabled_ = false;
+  watchdog_configured_ = true;
 }
 
 void ElmoMotorModule::finishHoming()
@@ -475,6 +490,9 @@ void ElmoMotorModule::resetPosCounter()
 
 void ElmoMotorModule::motorOn()
 {
+  if (isHomed_) {
+    enableWatchdog();
+  }
   canopen_set_int('M', 'O', 0, 1);
   canSync();
 }
@@ -483,6 +501,7 @@ void ElmoMotorModule::motorOff()
 {
   canopen_set_int('M', 'O', 0, 0);
   canSync();
+  disableWatchdog();
 }
 
 void ElmoMotorModule::setDigitalInput()
@@ -558,14 +577,18 @@ void ElmoMotorModule::canSync()
 
 bool ElmoMotorModule::isSocketOpened()
 {
-  return sockStatus_;
+  std::lock_guard<std::mutex> lock(can_mutex_);
+  return sockStatus_ && canSock_ >= 0;
 }
 
 void ElmoMotorModule::openSocket()
 {
-  if (!isError_ || canSock_ < 0) {
+  std::lock_guard<std::mutex> lock(can_mutex_);
+  if (!sockStatus_ || isError_ || canSock_ < 0) {
+    sockStatus_ = false;
     if (canSock_ >= 0) {
       ::close(canSock_);  // close first
+      canSock_ = -1;
     }
     try {
       // Open Socket
@@ -600,14 +623,18 @@ void ElmoMotorModule::openSocket()
                                                              << ex.what() << " (" <<
           ::strerror(errno) << ")");
       isError_ = true;
+      if (canSock_ >= 0) {
+        ::close(canSock_);
+        canSock_ = -1;
+      }
       return;
     }
-    can_condtion_.notify_all();  // notify that socket is ready
   }
 }
 
 void ElmoMotorModule::checkSocketError(bool & isError)
 {
+  std::lock_guard<std::mutex> lock(can_mutex_);
   isError = isError_;
 }
 
@@ -619,22 +646,38 @@ void ElmoMotorModule::readIOs()
 
 void ElmoMotorModule::readMotor()
 {
-  // close socket if error
-  if (isError_) {
-    ::close(canSock_);
-    sockStatus_ = false;
-    ::usleep(1000 * 1000);  // in case of error sleep some time
-    canSock_ = -1;
-    can_condtion_.notify_all();
+  int socket_fd;
+  {
+    std::lock_guard<std::mutex> lock(can_mutex_);
+    if (isError_ || canSock_ < 0) {
+      throw std::runtime_error("CAN socket is unavailable");
+    }
+    socket_fd = canSock_;
+  }
+  // Bound the wait so the receive thread can stop without closing its socket underneath it.
+  ::pollfd socket_poll = {socket_fd, POLLIN, 0};
+  const auto ready = ::poll(&socket_poll, 1, 100);
+  if (ready == 0 || (ready < 0 && errno == EINTR)) {
     return;
   }
-  // read a frame
+  if (ready < 0) {
+    throw std::runtime_error("poll() failed with: " + std::string(::strerror(errno)));
+  }
+  if (socket_poll.revents & (POLLERR | POLLHUP | POLLNVAL)) {
+    std::lock_guard<std::mutex> lock(can_mutex_);
+    isError_ = true;
+    throw std::runtime_error("CAN socket is no longer available");
+  }
+
+  // Read without blocking if the socket readiness changed after poll().
   ::can_frame frame = {};
-  const auto res = ::read(canSock_, &frame, sizeof(frame));
+  const auto res = ::recv(socket_fd, &frame, sizeof(frame), MSG_DONTWAIT);
+  if (res < 0 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)) {
+    return;
+  }
 
   if (res != sizeof(frame)) {
-    RCLCPP_WARN_STREAM(logger_, "read() failed with " << ::strerror(errno));
-    return;
+    throw std::runtime_error("recv() failed to read a complete CAN frame");
   }
 
   // convert frame
@@ -646,21 +689,33 @@ void ElmoMotorModule::readMotor()
   }
   // process it
   {
-    waitForCanSock_ = false;    // disable waiting for transmit (avoid dead-lock)
     std::lock_guard<std::mutex> lock(node_mutex_);
     try {
       handle(msg);
     } catch (const std::exception & ex) {
       RCLCPP_WARN_STREAM(logger_, ex.what());
     }
-    waitForCanSock_ = true;     // enable waiting again
   }
 }
 
 void ElmoMotorModule::shutdown()
 {
-  stopMotion();
-  motorOff();
+  // Repeated lifecycle cleanup must not transmit on an already closed socket.
+  std::exception_ptr shutdown_error;
+  if (isSocketOpened()) {
+    try {
+      stopMotion();
+    } catch (...) {
+      shutdown_error = std::current_exception();
+    }
+    try {
+      motorOff();
+    } catch (...) {
+      if (!shutdown_error) {
+        shutdown_error = std::current_exception();
+      }
+    }
+  }
 
   // close socket
   {
@@ -670,7 +725,10 @@ void ElmoMotorModule::shutdown()
       RCLCPP_INFO(logger_, "CAN communication is closed");
       canSock_ = -1;
     }
-    can_condtion_.notify_all();     // notify that socket is closed
+    sockStatus_ = false;
+  }
+  if (shutdown_error) {
+    std::rethrow_exception(shutdown_error);
   }
 }
 

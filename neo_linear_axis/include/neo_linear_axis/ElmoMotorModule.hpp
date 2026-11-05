@@ -29,6 +29,7 @@ SOFTWARE.
 #include <sys/socket.h>
 #include <sys/types.h>
 
+#include <mutex>
 #include <string>
 
 #include <neo_linear_axis/can_msg.hpp>
@@ -107,7 +108,6 @@ private:
   double currPose();
 
   motor_t motor_;
-  bool waitForCanSock_ = false;
   std::mutex node_mutex_;
   std::mutex can_mutex_;
   rclcpp::Clock clock_;
@@ -115,13 +115,14 @@ private:
   bool isHomed_ = false;
   bool isHoming_ = false;
   bool isStopped_ = true;
+  bool watchdog_configured_ = false;
+  bool watchdog_enabled_ = false;
   bool sockStatus_ = false;
   int HomeDigIn_ = 5;
   rclcpp::Time last_sync_time_;
 
   volatile bool doRun_ = true;
 
-  std::condition_variable can_condtion_;
   int canSock_ = -1;
 
   double homeVel_;
@@ -130,11 +131,10 @@ private:
   double last_command_ = 0.0;
   int heartbeat_divider_;
   double control_rate_;
-  int32_t dig_ins_[2];
+  int32_t dig_ins_[2] = {0, 0};
 
   bool isError_ = false;
   std::string canIface_;
-  bool shutdown_ = false;
 
   rclcpp::Logger logger_;
   rclcpp::Time last_update_time_;

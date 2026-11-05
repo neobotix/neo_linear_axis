@@ -67,8 +67,19 @@ void NeoLinearJoint::initMotor()
   motorOp_->configurePDOMapping();
   motorOp_->requestMotorStatus();
   motorOp_->readIOs();
-  motorOp_->motorOn();
+  motorOn();
   RCLCPP_INFO(logger_, "Initializing done");
+}
+
+void NeoLinearJoint::motorOn()
+{
+  // Clear the previous jog velocity before enabling, without changing the home reference or mode.
+  linearVel_ = 0.0;
+  motorOp_->motorSetVel(linearVel_);
+  if (!EMState_) {
+    motorOp_->motorOn();
+  }
+  motorOp_->requestMotorStatus();
 }
 
 void NeoLinearJoint::setCanIface(std::string & canIface)
@@ -127,8 +138,17 @@ void NeoLinearJoint::getGpioData(
 
 void NeoLinearJoint::stopMotion()
 {
+  linearVel_ = 0.0;
   motorOp_->stopMotion();
   motorOp_->motorOff();
+  // An interrupted initial homing or safety-position move must be allowed to resume.
+  if (motorOp_->isHoming() && !motorOp_->isHomed()) {
+    motorOp_->setIsHoming(false);
+  }
+  if (!safety_shift_) {
+    command_sent = false;
+    motor_on_ = false;
+  }
 }
 
 void NeoLinearJoint::setEMState(bool EMState)
@@ -191,6 +211,9 @@ void NeoLinearJoint::setJointVel(double & joint_velocity)
 
 void NeoLinearJoint::updateMotor()
 {
+  if (EMState_) {
+    return;
+  }
   // Check for motor timeouts
 
   if (motor_.state != ST_MOTOR_FAILURE) {
@@ -282,7 +305,7 @@ void NeoLinearJoint::updateMotor()
     }
 
     if ((syncCounter_ + 1) % heartbeatdivider_ == 0) {
-      motorOp_->sendHeartBeat();  // Heartbeat of master to slave
+      motorOp_->sendHeartBeat();
       motorOp_->readIOs();
     }
   }
