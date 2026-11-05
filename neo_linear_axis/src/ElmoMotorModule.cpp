@@ -22,6 +22,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
  *********************************************************************/
 
+#include <poll.h>
+
 #include "rclcpp/rclcpp.hpp"
 #include <neo_linear_axis/ElmoMotorModule.hpp>
 
@@ -628,6 +630,12 @@ void ElmoMotorModule::readMotor()
     can_condtion_.notify_all();
     return;
   }
+  // Periodically return so the receive loop can check its stop flag.
+  pollfd socket_poll = {canSock_, POLLIN, 0};
+  if (::poll(&socket_poll, 1, 100) <= 0) {
+    return;
+  }
+
   // read a frame
   ::can_frame frame = {};
   const auto res = ::read(canSock_, &frame, sizeof(frame));
@@ -670,6 +678,7 @@ void ElmoMotorModule::shutdown()
       RCLCPP_INFO(logger_, "CAN communication is closed");
       canSock_ = -1;
     }
+    sockStatus_ = false;
     can_condtion_.notify_all();     // notify that socket is closed
   }
 }

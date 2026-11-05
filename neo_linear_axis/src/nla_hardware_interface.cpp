@@ -109,6 +109,11 @@ CallbackReturn NlaHardwareInterface::on_init(
 
 CallbackReturn NlaHardwareInterface::on_configure(const rclcpp_lifecycle::State & /*info*/)
 {
+  return CallbackReturn::SUCCESS;
+}
+
+CallbackReturn NlaHardwareInterface::on_activate(const rclcpp_lifecycle::State &)
+{
   if (!linear_joint_->isSocketOpened()) {
     // Comms initialization
     bool socketError = false;
@@ -124,14 +129,10 @@ CallbackReturn NlaHardwareInterface::on_configure(const rclcpp_lifecycle::State 
     loop_rate.sleep();
   }
 
-  return CallbackReturn::SUCCESS;
-}
-
-CallbackReturn NlaHardwareInterface::on_activate(const rclcpp_lifecycle::State &)
-{
   // Starting the motors
   RCLCPP_INFO(get_logger(), "Initializing motors");
   linear_joint_->initMotor();
+  receive_running_ = true;
   read_thread_ = std::thread(&NlaHardwareInterface::receive_loop, this);
   return CallbackReturn::SUCCESS;
 }
@@ -139,6 +140,11 @@ CallbackReturn NlaHardwareInterface::on_activate(const rclcpp_lifecycle::State &
 CallbackReturn NlaHardwareInterface::on_deactivate(const rclcpp_lifecycle::State & /*info*/)
 {
   RCLCPP_INFO(get_logger(), "Shutting down");
+  linear_joint_->stopMotion();
+  receive_running_ = false;
+  if (read_thread_.joinable()) {
+    read_thread_.join();
+  }
   linear_joint_->shutdown();
   return CallbackReturn::SUCCESS;
 }
@@ -153,7 +159,7 @@ CallbackReturn NlaHardwareInterface::on_error(const rclcpp_lifecycle::State & /*
 void NlaHardwareInterface::receive_loop()
 {
   // Send request for reading the motor data
-  while(rclcpp::ok()) {
+  while (receive_running_ && rclcpp::ok()) {
     linear_joint_->readMotor();
   }
 }
