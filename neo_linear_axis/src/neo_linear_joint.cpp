@@ -57,13 +57,16 @@ void NeoLinearJoint::setCommonMotorParams(
 
 void NeoLinearJoint::initMotor()
 {
+  linearVel_ = 0.0;
   motorOp_->motorOff();
   motorOp_->stopMotion();
 
   // Disable watchdog
   motorOp_->setMotorModulo();
-  motorOp_->enablePosMode();  // Just for Homing
-  motorOp_->resetPosCounter();
+  if (!motorOp_->isHomed()) {
+    motorOp_->enablePosMode();  // Just for Homing
+    motorOp_->resetPosCounter();
+  }
   motorOp_->configurePDOMapping();
   motorOp_->requestMotorStatus();
   motorOp_->readIOs();

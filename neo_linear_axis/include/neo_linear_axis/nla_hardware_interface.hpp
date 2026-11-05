@@ -62,6 +62,8 @@ public:
   void receive_loop();
 
 private:
+  void stop_receive_thread();
+
   double timeout_ = 0.2;
   double homeVel_ = -0.03;
   int homeDigIn_ = 5;

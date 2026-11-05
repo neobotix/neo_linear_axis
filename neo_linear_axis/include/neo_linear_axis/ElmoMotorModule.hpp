@@ -134,7 +134,7 @@ private:
 
   bool isError_ = false;
   std::string canIface_;
-  bool shutdown_ = false;
+  bool shutdown_ = true;
 
   rclcpp::Logger logger_;
   rclcpp::Time last_update_time_;

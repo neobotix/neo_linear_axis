@@ -596,6 +596,7 @@ void ElmoMotorModule::openSocket()
         logger_, "CAN interface '" << canIface_ << "' opened successfully.");
       sockStatus_ = true;
       isError_ = false;
+      shutdown_ = false;
     } catch (const std::exception & ex) {
       RCLCPP_WARN_STREAM(
         logger_, "Failed to open CAN interface '"            << canIface_ << "': "
@@ -667,6 +668,10 @@ void ElmoMotorModule::readMotor()
 
 void ElmoMotorModule::shutdown()
 {
+  if (shutdown_) {
+    return;
+  }
+
   stopMotion();
   motorOff();
 
@@ -679,6 +684,7 @@ void ElmoMotorModule::shutdown()
       canSock_ = -1;
     }
     sockStatus_ = false;
+    shutdown_ = true;
     can_condtion_.notify_all();     // notify that socket is closed
   }
 }
